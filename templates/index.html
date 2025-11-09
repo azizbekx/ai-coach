@@ -17,17 +17,33 @@
             <p class="tagline">Olympic-Level Training System with Computer Vision</p>
         </header>
 
-        <!-- Mode Selection -->
-        <div class="mode-selector">
-            <button class="mode-btn active" data-mode="upload" id="uploadModeBtn">
-                <span class="mode-icon">📁</span>
-                <span class="mode-text">Upload Video</span>
+        <!-- Section Selection -->
+        <div class="section-selector">
+            <button class="section-btn active" data-section="scoring" id="scoringSection">
+                <span class="section-icon">📊</span>
+                <span class="section-text">Video Scoring</span>
+                <span class="section-subtitle">Upload & Live Webcam with ML Analysis</span>
             </button>
-            <button class="mode-btn" data-mode="webcam" id="webcamModeBtn">
-                <span class="mode-icon">📹</span>
-                <span class="mode-text">Live Webcam</span>
+            <button class="section-btn" data-section="training" id="trainingSection">
+                <span class="section-icon">🎓</span>
+                <span class="section-text">AI Training</span>
+                <span class="section-subtitle">Real-time Coaching with Gemini AI</span>
             </button>
         </div>
+
+        <!-- Video Scoring Section -->
+        <div id="scoringContent" class="section-content active">
+            <!-- Mode Selection for Scoring -->
+            <div class="mode-selector">
+                <button class="mode-btn active" data-mode="upload" id="uploadModeBtn">
+                    <span class="mode-icon">📁</span>
+                    <span class="mode-text">Upload Video</span>
+                </button>
+                <button class="mode-btn" data-mode="webcam" id="webcamModeBtn">
+                    <span class="mode-icon">📹</span>
+                    <span class="mode-text">Live Webcam</span>
+                </button>
+            </div>
 
         <!-- Upload Mode -->
         <div id="uploadMode" class="mode-content active">
@@ -89,6 +105,14 @@
                         <div id="errorsList" class="errors-list"></div>
                     </div>
 
+                    <!-- Gemini AI Summary -->
+                    <div id="geminiSummary" class="gemini-summary-section" style="display: none;">
+                        <h3>🤖 AI Coach Summary</h3>
+                        <div id="geminiSummaryContent" class="gemini-summary-content">
+                            <div class="loading-spinner">Generating AI summary...</div>
+                        </div>
+                    </div>
+
                     <div class="video-download">
                         <button id="downloadBtn" class="download-btn">
                             <span>⬇️</span> Download Analyzed Video
@@ -101,7 +125,7 @@
             </div>
         </div>
 
-        <!-- Webcam Mode -->
+        <!-- Webcam Mode (ML Scoring) -->
         <div id="webcamMode" class="mode-content">
             <div class="webcam-section">
                 <div class="webcam-container">
@@ -180,6 +204,219 @@
                 </div>
             </div>
         </div>
+        </div> <!-- End of Video Scoring Section -->
+
+        <!-- AI Training Section -->
+        <div id="trainingContent" class="section-content">
+            <div class="training-section">
+                <!-- Training Mode Selector -->
+                <div class="training-mode-selector">
+                    <button class="training-mode-btn active" data-training-mode="single">
+                        Single Action
+                    </button>
+                    <button class="training-mode-btn" data-training-mode="warmup">
+                        Warm-Up Sequence
+                    </button>
+                </div>
+
+                <!-- Warm-Up Sequences -->
+                <div id="warmupSelection" class="warmup-selection" style="display: none;">
+                    <h2>Choose a Warm-Up Routine</h2>
+                    <p class="training-subtitle">Complete a sequence of actions with AI guidance</p>
+
+                    <div class="warmup-grid" id="warmupGrid">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Skill Selection -->
+                <div id="skillSelection" class="skill-selection">
+                    <h2>Choose an Action to Practice</h2>
+                    <p class="training-subtitle">Real-time AI coaching with live feedback - Perfect for demos!</p>
+
+                    <div class="skills-grid" id="skillsGrid">
+                        <div class="skill-card" data-skill="sitting_posture">
+                            <div class="skill-icon">🪑</div>
+                            <h3>Sitting Posture</h3>
+                            <p>Learn proper desk posture for developers</p>
+                        </div>
+                        <div class="skill-card" data-skill="standing_straight">
+                            <div class="skill-icon">🧍</div>
+                            <h3>Standing Straight</h3>
+                            <p>Practice good standing alignment</p>
+                        </div>
+                        <div class="skill-card" data-skill="arms_raised">
+                            <div class="skill-icon">🙌</div>
+                            <h3>Arms Raised</h3>
+                            <p>Raise both arms overhead correctly</p>
+                        </div>
+                        <div class="skill-card" data-skill="thumbs_up">
+                            <div class="skill-icon">👍</div>
+                            <h3>Thumbs Up</h3>
+                            <p>Simple gesture recognition demo</p>
+                        </div>
+                        <div class="skill-card" data-skill="t_pose">
+                            <div class="skill-icon">🤷</div>
+                            <h3>T-Pose</h3>
+                            <p>Arms extended horizontally</p>
+                        </div>
+                        <div class="skill-card" data-skill="stretching">
+                            <div class="skill-icon">🤸</div>
+                            <h3>Simple Stretch</h3>
+                            <p>Basic stretching for desk workers</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Training Flow - Real-time Coaching -->
+                <div id="trainingFlow" class="training-flow" style="display: none;">
+                    <div class="training-header">
+                        <h2 id="trainingSkillName">Live Coaching Session</h2>
+                        <button id="stopCoachingBtn" class="stop-btn">Stop Coaching</button>
+                    </div>
+
+                    <!-- Live Coaching View -->
+                    <div class="live-coaching-container">
+                        <div class="video-section">
+                            <div class="live-video-panel">
+                                <h4>Your Camera</h4>
+                                <video id="trainingVideo" autoplay playsinline></video>
+                                <canvas id="trainingCanvas" style="display: none;"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="coaching-panel">
+                            <div class="instruction-box">
+                                <h4>📋 What to Do</h4>
+                                <div id="instructionText" class="instruction-text">
+                                    Starting coaching session...
+                                </div>
+                                <button id="readInstructionBtn" class="icon-btn">
+                                    🔊 Speak Instructions
+                                </button>
+                            </div>
+
+                            <div class="live-feedback-box">
+                                <h4>🤖 AI Coach Feedback</h4>
+                                <div id="liveFeedbackText" class="live-feedback-text">
+                                    <div class="feedback-waiting">
+                                        <span class="pulse-dot"></span>
+                                        Analyzing your posture...
+                                    </div>
+                                </div>
+                                <div class="feedback-timestamp" id="feedbackTimestamp">-</div>
+                            </div>
+
+                            <div class="quick-tips-box">
+                                <h4>💡 Quick Tips</h4>
+                                <ul id="quickTipsList" class="quick-tips-list">
+                                    <li>Position yourself so your full body is visible</li>
+                                    <li>Make sure you have good lighting</li>
+                                    <li>Listen to the voice feedback</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Warm-Up Flow -->
+                <div id="warmupFlow" class="warmup-flow" style="display: none;">
+                    <div class="warmup-header">
+                        <h2 id="warmupSequenceName">Warm-Up Sequence</h2>
+                        <button id="stopWarmupBtn" class="stop-btn">Stop Warm-Up</button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="warmup-progress">
+                        <div class="progress-info">
+                            <span id="currentActionNumber">1</span> of <span id="totalActions">5</span> actions
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" id="warmupProgressBar"></div>
+                        </div>
+                    </div>
+
+                    <!-- Current Action Display -->
+                    <div class="current-action-banner">
+                        <div class="action-icon" id="currentActionIcon">🤸</div>
+                        <div class="action-info">
+                            <h3 id="currentActionName">Standing Straight</h3>
+                            <p id="currentActionDuration">Hold for 5 seconds</p>
+                        </div>
+                    </div>
+
+                    <!-- Warm-Up Coaching View -->
+                    <div class="live-coaching-container">
+                        <div class="video-section">
+                            <div class="live-video-panel">
+                                <h4>Your Camera</h4>
+                                <video id="warmupVideo" autoplay playsinline></video>
+                                <canvas id="warmupCanvas" style="display: none;"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="coaching-panel">
+                            <div class="instruction-box">
+                                <h4>📋 Instructions</h4>
+                                <div id="warmupInstructionText" class="instruction-text">
+                                    Loading instructions...
+                                </div>
+                                <button id="readWarmupInstructionBtn" class="icon-btn">
+                                    🔊 Speak Instructions
+                                </button>
+                            </div>
+
+                            <div class="live-feedback-box">
+                                <h4>🤖 AI Coach Feedback</h4>
+                                <div id="warmupFeedbackText" class="live-feedback-text">
+                                    <div class="feedback-waiting">
+                                        <span class="pulse-dot"></span>
+                                        Get into position...
+                                    </div>
+                                </div>
+                                <div id="warmupCorrectIndicator" class="correct-indicator" style="display: none;">
+                                    ✅ Correct! Moving to next action...
+                                </div>
+                            </div>
+
+                            <div class="actions-list-box">
+                                <h4>📝 Sequence</h4>
+                                <ul id="warmupActionsList" class="warmup-actions-list">
+                                    <!-- Will be populated dynamically -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Completion Screen -->
+                    <div id="warmupCompletion" class="warmup-completion" style="display: none;">
+                        <div class="completion-content">
+                            <div class="completion-icon">🎉</div>
+                            <h2>Warm-Up Complete!</h2>
+                            <p>Great job! You've completed all actions in the sequence.</p>
+                            <div class="completion-stats">
+                                <div class="stat">
+                                    <span class="stat-number" id="completionTime">0:00</span>
+                                    <span class="stat-label">Time</span>
+                                </div>
+                                <div class="stat">
+                                    <span class="stat-number" id="completionActions">5</span>
+                                    <span class="stat-label">Actions</span>
+                                </div>
+                            </div>
+                            <div class="completion-actions">
+                                <button id="doAnotherWarmupBtn" class="primary-btn">
+                                    🔄 Do Another Warm-Up
+                                </button>
+                                <button id="backToMenuBtn" class="secondary-btn">
+                                    ← Back to Menu
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- End of AI Training Section -->
 
         <!-- Footer -->
         <footer class="footer">

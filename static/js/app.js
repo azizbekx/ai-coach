@@ -19,12 +19,50 @@ class GymnasticsCoachApp {
     }
 
     init() {
+        this.setupSectionSelector();
         this.setupModeSelector();
         this.setupUploadMode();
+        this.setupTrainingMode();
         this.setupWebcamMode();
     }
 
-    // Mode Selection
+    // Section Selection (Video Scoring vs AI Training)
+    setupSectionSelector() {
+        const sectionBtns = document.querySelectorAll('.section-btn');
+        sectionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const section = btn.dataset.section;
+                this.switchSection(section);
+            });
+        });
+    }
+
+    switchSection(section) {
+        // Update section buttons
+        document.querySelectorAll('.section-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.section === section);
+        });
+
+        // Update section content
+        document.querySelectorAll('.section-content').forEach(content => {
+            content.classList.remove('active');
+        });
+
+        const targetSection = document.getElementById(`${section}Content`);
+        if (targetSection) {
+            targetSection.classList.add('active');
+        }
+
+        // Stop any active streams when switching sections
+        if (section !== 'scoring' && this.webcamStream) {
+            this.stopWebcam();
+        }
+        if (section !== 'training' && this.trainingStream) {
+            this.stopTraining();
+        }
+    }
+
+    // Mode Selection (within sections)
     setupModeSelector() {
         const modeBtns = document.querySelectorAll('.mode-btn');
         modeBtns.forEach(btn => {
@@ -187,11 +225,47 @@ class GymnasticsCoachApp {
             errorsList.innerHTML = '<p style="color: var(--text-muted);">No common errors detected</p>';
         }
 
+        // Generate Gemini AI Summary
+        this.generateGeminiSummary(results);
+
         // Download button
         const downloadBtn = document.getElementById('downloadBtn');
         downloadBtn.onclick = () => {
             window.location.href = data.output_video;
         };
+    }
+
+    async generateGeminiSummary(results) {
+        const summarySection = document.getElementById('geminiSummary');
+        const summaryContent = document.getElementById('geminiSummaryContent');
+
+        // Show section with loading state
+        summarySection.style.display = 'block';
+        summaryContent.innerHTML = '<div class="loading-spinner">🤖 Generating AI coaching summary...</div>';
+
+        try {
+            const response = await fetch('/api/upload/summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ results })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate summary');
+            }
+
+            const data = await response.json();
+
+            if (data.success && data.summary) {
+                summaryContent.innerHTML = `<div class="gemini-summary-text">${data.summary.replace(/\n/g, '<br>')}</div>`;
+            } else {
+                summaryContent.innerHTML = '<p style="color: var(--text-muted);">AI summary not available</p>';
+            }
+
+        } catch (error) {
+            console.error('Error generating Gemini summary:', error);
+            summaryContent.innerHTML = '<p style="color: var(--text-muted);">Could not generate AI summary. Ensure GEMINI_API_KEY is set.</p>';
+        }
     }
 
     resetUploadMode() {
@@ -200,6 +274,653 @@ class GymnasticsCoachApp {
         document.getElementById('uploadResults').style.display = 'none';
         document.getElementById('videoInput').value = '';
         document.getElementById('progressFill').style.width = '0%';
+    }
+
+    // AI Training Mode
+    setupTrainingMode() {
+        this.currentSkill = null;
+        this.trainingStream = null;
+        this.currentInstruction = null;
+        this.coachingInterval = null;
+        this.lastFeedbackTime = 0;
+
+        // Warm-up specific
+        this.currentSequence = null;
+        this.currentActionIndex = 0;
+        this.warmupStartTime = null;
+
+        // Training mode toggle (Single vs Warm-Up)
+        const trainingModeBtns = document.querySelectorAll('.training-mode-btn');
+        trainingModeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const mode = btn.dataset.trainingMode;
+                this.switchTrainingMode(mode);
+            });
+        });
+
+        // Skill selection (single action)
+        const skillCards = document.querySelectorAll('.skill-card');
+        skillCards.forEach(card => {
+            card.addEventListener('click', () => {
+                const skill = card.dataset.skill;
+                this.startRealTimeCoaching(skill);
+            });
+        });
+
+        // Load warm-up sequences
+        this.loadWarmupSequences();
+
+        // Control buttons
+        const readBtn = document.getElementById('readInstructionBtn');
+        if (readBtn) {
+            readBtn.addEventListener('click', () => {
+                this.readInstructionAloud();
+            });
+        }
+
+        const stopBtn = document.getElementById('stopCoachingBtn');
+        if (stopBtn) {
+            stopBtn.addEventListener('click', () => {
+                this.stopCoaching();
+            });
+        }
+
+        // Warm-up buttons
+        const readWarmupBtn = document.getElementById('readWarmupInstructionBtn');
+        if (readWarmupBtn) {
+            readWarmupBtn.addEventListener('click', () => {
+                this.readInstructionAloud();
+            });
+        }
+
+        const stopWarmupBtn = document.getElementById('stopWarmupBtn');
+        if (stopWarmupBtn) {
+            stopWarmupBtn.addEventListener('click', () => {
+                this.stopWarmup();
+            });
+        }
+
+        const doAnotherBtn = document.getElementById('doAnotherWarmupBtn');
+        if (doAnotherBtn) {
+            doAnotherBtn.addEventListener('click', () => {
+                this.backToWarmupSelection();
+            });
+        }
+
+        const backToMenuBtn = document.getElementById('backToMenuBtn');
+        if (backToMenuBtn) {
+            backToMenuBtn.addEventListener('click', () => {
+                this.stopWarmup();
+                this.switchTrainingMode('single');
+            });
+        }
+    }
+
+    switchTrainingMode(mode) {
+        // Update buttons
+        document.querySelectorAll('.training-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.trainingMode === mode);
+        });
+
+        // Show/hide sections
+        if (mode === 'single') {
+            document.getElementById('skillSelection').style.display = 'block';
+            document.getElementById('warmupSelection').style.display = 'none';
+        } else {
+            document.getElementById('skillSelection').style.display = 'none';
+            document.getElementById('warmupSelection').style.display = 'block';
+        }
+    }
+
+    async loadWarmupSequences() {
+        try {
+            const response = await fetch('/api/warmup/sequences');
+            const data = await response.json();
+
+            const grid = document.getElementById('warmupGrid');
+            grid.innerHTML = '';
+
+            data.sequences.forEach(seq => {
+                const card = document.createElement('div');
+                card.className = 'warmup-card';
+                card.dataset.sequenceId = seq.id;
+                card.innerHTML = `
+                    <div class="warmup-icon">${seq.icon}</div>
+                    <h3>${seq.name}</h3>
+                    <p>${seq.description}</p>
+                    <div class="warmup-meta">${seq.action_count} actions</div>
+                `;
+                card.addEventListener('click', () => {
+                    this.startWarmup(seq.id);
+                });
+                grid.appendChild(card);
+            });
+        } catch (error) {
+            console.error('Error loading warm-up sequences:', error);
+        }
+    }
+
+    async startWarmup(sequenceId) {
+        try {
+            const response = await fetch(`/api/warmup/${sequenceId}`);
+            const data = await response.json();
+
+            this.currentSequence = data.sequence;
+            this.currentActionIndex = 0;
+            this.warmupStartTime = Date.now();
+
+            // Hide selection, show flow
+            document.getElementById('warmupSelection').style.display = 'none';
+            document.getElementById('warmupFlow').style.display = 'block';
+            document.getElementById('warmupCompletion').style.display = 'none';
+
+            // Update header
+            document.getElementById('warmupSequenceName').textContent = this.currentSequence.name;
+
+            // Update progress
+            document.getElementById('totalActions').textContent = this.currentSequence.actions.length;
+
+            // Build actions list
+            this.updateWarmupActionsList();
+
+            // Start first action
+            await this.startWarmupAction();
+
+        } catch (error) {
+            console.error('Error starting warm-up:', error);
+            alert('Failed to start warm-up: ' + error.message);
+        }
+    }
+
+    async startWarmupAction() {
+        const action = this.currentSequence.actions[this.currentActionIndex];
+        this.currentSkill = action.skill;
+
+        // Update UI
+        document.getElementById('currentActionNumber').textContent = this.currentActionIndex + 1;
+        const skillName = action.skill.replace('_', ' ').split('_').map(word =>
+            word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+        document.getElementById('currentActionName').textContent = skillName;
+        document.getElementById('currentActionDuration').textContent = action.duration;
+
+        // Update progress bar
+        const progress = ((this.currentActionIndex) / this.currentSequence.actions.length) * 100;
+        document.getElementById('warmupProgressBar').style.width = `${progress}%`;
+
+        // Update actions list highlighting
+        this.updateWarmupActionsList();
+
+        // Load instruction
+        await this.loadInstruction(action.skill, 'warmupInstructionText');
+
+        // Start webcam and coaching if not already started
+        if (!this.trainingStream) {
+            await this.startWarmupCoaching();
+        }
+    }
+
+    updateWarmupActionsList() {
+        const list = document.getElementById('warmupActionsList');
+        list.innerHTML = '';
+
+        this.currentSequence.actions.forEach((action, index) => {
+            const li = document.createElement('li');
+            li.className = 'warmup-action-item';
+
+            if (index < this.currentActionIndex) {
+                li.classList.add('completed');
+            } else if (index === this.currentActionIndex) {
+                li.classList.add('current');
+            }
+
+            const skillName = action.skill.replace('_', ' ').split('_').map(word =>
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+
+            li.innerHTML = `
+                <span class="action-status">${index < this.currentActionIndex ? '✅' : index === this.currentActionIndex ? '▶' : '○'}</span>
+                <span class="action-name">${skillName}</span>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    async startWarmupCoaching() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user'
+                }
+            });
+
+            this.trainingStream = stream;
+            const video = document.getElementById('warmupVideo');
+            video.srcObject = stream;
+
+            await new Promise(resolve => {
+                video.onloadedmetadata = () => {
+                    video.play();
+                    resolve();
+                };
+            });
+
+            // Start coaching (every 3 seconds for warm-up)
+            this.coachingInterval = setInterval(() => {
+                this.analyzeWarmupAction();
+            }, 3000);
+
+            // First analysis after 1 second
+            setTimeout(() => this.analyzeWarmupAction(), 1000);
+
+        } catch (error) {
+            console.error('Webcam error:', error);
+            alert('Failed to access webcam: ' + error.message);
+            this.stopWarmup();
+        }
+    }
+
+    async analyzeWarmupAction() {
+        if (!this.trainingStream || !this.currentSkill) return;
+
+        const video = document.getElementById('warmupVideo');
+        const canvas = document.getElementById('warmupCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+
+        const frameData = canvas.toDataURL('image/jpeg', 0.8);
+
+        const feedbackEl = document.getElementById('warmupFeedbackText');
+        feedbackEl.innerHTML = '<div class="feedback-waiting"><span class="pulse-dot"></span> Analyzing...</div>';
+
+        try {
+            const response = await fetch('/api/training/assess', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    skill: this.currentSkill,
+                    frame: frameData
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Assessment failed');
+            }
+
+            const result = await response.json();
+            this.displayWarmupFeedback(result);
+
+        } catch (error) {
+            console.error('Warm-up coaching error:', error);
+            feedbackEl.innerHTML = `<div class="feedback-error">⚠️ ${error.message}<br><small>Make sure GEMINI_API_KEY is set</small></div>`;
+        }
+    }
+
+    displayWarmupFeedback(result) {
+        const feedbackEl = document.getElementById('warmupFeedbackText');
+        const correctIndicator = document.getElementById('warmupCorrectIndicator');
+
+        let feedbackHTML = '';
+
+        if (result.is_correct) {
+            feedbackHTML = '<div class="feedback-positive">✅ <strong>Perfect!</strong> ' + (result.encouragement || 'Great job!') + '</div>';
+
+            // Show correct indicator
+            correctIndicator.style.display = 'block';
+
+            // Auto-advance to next action after 2 seconds
+            setTimeout(() => {
+                this.advanceToNextAction();
+            }, 2000);
+        } else {
+            feedbackHTML = '<div class="feedback-improve">📝 <strong>Keep trying!</strong> ';
+            if (result.corrections && result.corrections.length > 0) {
+                feedbackHTML += result.corrections[0];
+            }
+            feedbackHTML += '</div>';
+
+            correctIndicator.style.display = 'none';
+        }
+
+        feedbackEl.innerHTML = feedbackHTML;
+
+        // Voice feedback (throttled)
+        const nowTime = Date.now();
+        if (nowTime - this.lastFeedbackTime > 8000) {
+            this.lastFeedbackTime = nowTime;
+
+            const textToSpeak = result.is_correct ?
+                (result.encouragement || 'Perfect! Moving to next action') :
+                (result.corrections[0] || 'Keep trying!');
+
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.rate = 0.95;
+            this.speechSynthesis.speak(utterance);
+        }
+    }
+
+    async advanceToNextAction() {
+        this.currentActionIndex++;
+
+        if (this.currentActionIndex >= this.currentSequence.actions.length) {
+            // Sequence complete!
+            this.completeWarmup();
+        } else {
+            // Load next action
+            await this.startWarmupAction();
+        }
+    }
+
+    completeWarmup() {
+        // Stop coaching
+        if (this.coachingInterval) {
+            clearInterval(this.coachingInterval);
+            this.coachingInterval = null;
+        }
+
+        if (this.trainingStream) {
+            this.trainingStream.getTracks().forEach(track => track.stop());
+            this.trainingStream = null;
+        }
+
+        // Calculate time
+        const totalTime = Math.floor((Date.now() - this.warmupStartTime) / 1000);
+        const minutes = Math.floor(totalTime / 60);
+        const seconds = totalTime % 60;
+
+        // Show completion screen
+        document.getElementById('warmupFlow').querySelector('.live-coaching-container').style.display = 'none';
+        document.getElementById('warmupFlow').querySelector('.current-action-banner').style.display = 'none';
+        document.getElementById('warmupCompletion').style.display = 'block';
+
+        document.getElementById('completionTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        document.getElementById('completionActions').textContent = this.currentSequence.actions.length;
+
+        // Speak completion
+        const utterance = new SpeechSynthesisUtterance('Congratulations! You\'ve completed the warm-up sequence!');
+        this.speechSynthesis.speak(utterance);
+    }
+
+    backToWarmupSelection() {
+        document.getElementById('warmupFlow').style.display = 'none';
+        document.getElementById('warmupCompletion').style.display = 'none';
+        document.getElementById('warmupSelection').style.display = 'block';
+
+        // Reset state
+        this.currentSequence = null;
+        this.currentActionIndex = 0;
+    }
+
+    stopWarmup() {
+        if (this.coachingInterval) {
+            clearInterval(this.coachingInterval);
+            this.coachingInterval = null;
+        }
+
+        if (this.trainingStream) {
+            this.trainingStream.getTracks().forEach(track => track.stop());
+            this.trainingStream = null;
+        }
+
+        if (this.speechSynthesis) {
+            this.speechSynthesis.cancel();
+        }
+
+        document.getElementById('warmupFlow').style.display = 'none';
+        document.getElementById('warmupCompletion').style.display = 'none';
+        document.getElementById('warmupSelection').style.display = 'block';
+
+        this.currentSequence = null;
+        this.currentActionIndex = 0;
+    }
+
+    async startRealTimeCoaching(skill) {
+        this.currentSkill = skill;
+
+        // Show training flow, hide skill selection
+        document.getElementById('skillSelection').style.display = 'none';
+        document.getElementById('trainingFlow').style.display = 'block';
+
+        // Update skill name
+        const skillName = skill.replace('_', ' ').split('_').map(word =>
+            word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+        document.getElementById('trainingSkillName').textContent = `${skillName} - Live Coaching`;
+
+        // Load instruction
+        await this.loadInstruction(skill);
+
+        // Start webcam and coaching
+        await this.startLiveCoaching();
+    }
+
+    async loadInstruction(skill, targetElementId = 'instructionText') {
+        try {
+            const response = await fetch('/api/training/instruction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ skill })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load instruction');
+            }
+
+            const data = await response.json();
+            this.currentInstruction = data.instruction;
+
+            // Display instruction
+            const element = document.getElementById(targetElementId);
+            if (element) {
+                element.innerHTML = data.instruction.replace(/\n/g, '<br>');
+            }
+
+            // Automatically read instruction aloud (only for initial load, not warmup transitions)
+            if (targetElementId === 'instructionText') {
+                setTimeout(() => {
+                    this.readInstructionAloud();
+                }, 500);
+            }
+
+        } catch (error) {
+            console.error('Error loading instruction:', error);
+            const element = document.getElementById(targetElementId);
+            if (element) {
+                element.textContent = 'Error loading instruction. Please try again.';
+            }
+        }
+    }
+
+    readInstructionAloud() {
+        if (!this.currentInstruction) return;
+
+        // Stop any ongoing speech
+        if (this.speechSynthesis) {
+            this.speechSynthesis.cancel();
+        }
+
+        const utterance = new SpeechSynthesisUtterance(this.currentInstruction);
+        utterance.rate = 0.9;  // Slightly slower for clarity
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        // Try to use a natural voice
+        const voices = this.speechSynthesis.getVoices();
+        const preferredVoice = voices.find(voice =>
+            voice.lang.startsWith('en') &&
+            (voice.name.includes('Google') || voice.name.includes('Natural') || voice.name.includes('Female'))
+        );
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
+
+        this.speechSynthesis.speak(utterance);
+    }
+
+    async startLiveCoaching() {
+        try {
+            // Start webcam
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user'
+                }
+            });
+
+            this.trainingStream = stream;
+            const video = document.getElementById('trainingVideo');
+            video.srcObject = stream;
+
+            // Wait for video to be ready
+            await new Promise(resolve => {
+                video.onloadedmetadata = () => {
+                    video.play();
+                    resolve();
+                };
+            });
+
+            // Start continuous coaching (analyze every 4 seconds)
+            this.coachingInterval = setInterval(() => {
+                this.analyzeAndCoach();
+            }, 4000);
+
+            // Do first analysis after 1 second
+            setTimeout(() => this.analyzeAndCoach(), 1000);
+
+        } catch (error) {
+            console.error('Webcam error:', error);
+            alert('Failed to access webcam: ' + error.message);
+            this.stopCoaching();
+        }
+    }
+
+    async analyzeAndCoach() {
+        if (!this.trainingStream || !this.currentSkill) return;
+
+        const video = document.getElementById('trainingVideo');
+        const canvas = document.getElementById('trainingCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Capture current frame
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+
+        const frameData = canvas.toDataURL('image/jpeg', 0.8);
+
+        // Update UI to show analyzing
+        const feedbackEl = document.getElementById('liveFeedbackText');
+        feedbackEl.innerHTML = '<div class="feedback-waiting"><span class="pulse-dot"></span> Analyzing...</div>';
+
+        try {
+            const response = await fetch('/api/training/assess', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    skill: this.currentSkill,
+                    frame: frameData
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Assessment failed');
+            }
+
+            const result = await response.json();
+            this.displayLiveCoachingFeedback(result);
+
+        } catch (error) {
+            console.error('Coaching error:', error);
+            feedbackEl.innerHTML = `<div class="feedback-error">⚠️ ${error.message}<br><small>Make sure GEMINI_API_KEY is set</small></div>`;
+        }
+    }
+
+    displayLiveCoachingFeedback(result) {
+        const feedbackEl = document.getElementById('liveFeedbackText');
+        const timestampEl = document.getElementById('feedbackTimestamp');
+
+        // Format feedback based on what we have
+        let feedbackHTML = '';
+
+        if (result.is_correct) {
+            feedbackHTML += '<div class="feedback-positive">✅ <strong>Great!</strong> ';
+        } else {
+            feedbackHTML += '<div class="feedback-improve">📝 <strong>Keep going!</strong> ';
+        }
+
+        // Add main feedback
+        if (result.corrections && result.corrections.length > 0) {
+            feedbackHTML += result.corrections[0];
+        } else if (result.encouragement) {
+            feedbackHTML += result.encouragement;
+        }
+
+        feedbackHTML += '</div>';
+
+        // Add full assessment if available
+        if (result.assessment && result.assessment.length > 50) {
+            feedbackHTML += `<div class="feedback-details"><small>${result.assessment.substring(0, 200)}...</small></div>`;
+        }
+
+        feedbackEl.innerHTML = feedbackHTML;
+
+        // Update timestamp
+        const now = new Date();
+        timestampEl.textContent = `Last updated: ${now.toLocaleTimeString()}`;
+
+        // Speak the first correction or encouragement (throttled)
+        const nowTime = Date.now();
+        if (nowTime - this.lastFeedbackTime > 8000) { // At most every 8 seconds
+            this.lastFeedbackTime = nowTime;
+
+            const textToSpeak = result.corrections[0] || result.encouragement || 'Looking good!';
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.rate = 0.95;
+            this.speechSynthesis.speak(utterance);
+        }
+    }
+
+    stopCoaching() {
+        // Stop coaching interval
+        if (this.coachingInterval) {
+            clearInterval(this.coachingInterval);
+            this.coachingInterval = null;
+        }
+
+        // Stop webcam
+        if (this.trainingStream) {
+            this.trainingStream.getTracks().forEach(track => track.stop());
+            this.trainingStream = null;
+        }
+
+        // Stop speech
+        if (this.speechSynthesis) {
+            this.speechSynthesis.cancel();
+        }
+
+        // Back to skill selection
+        document.getElementById('trainingFlow').style.display = 'none';
+        document.getElementById('skillSelection').style.display = 'block';
+    }
+
+    stopTraining() {
+        if (this.trainingStream) {
+            this.trainingStream.getTracks().forEach(track => track.stop());
+            this.trainingStream = null;
+        }
+
+        if (this.speechSynthesis) {
+            this.speechSynthesis.cancel();
+        }
+
+        // Reset to skill selection
+        this.backToSkillSelection();
     }
 
     // Webcam Mode
