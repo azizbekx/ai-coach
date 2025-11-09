@@ -17,21 +17,33 @@
             <p class="tagline">Olympic-Level Training System with Computer Vision</p>
         </header>
 
-        <!-- Mode Selection -->
-        <div class="mode-selector">
-            <button class="mode-btn active" data-mode="upload" id="uploadModeBtn">
-                <span class="mode-icon">📁</span>
-                <span class="mode-text">Upload Video</span>
+        <!-- Section Selection -->
+        <div class="section-selector">
+            <button class="section-btn active" data-section="scoring" id="scoringSection">
+                <span class="section-icon">📊</span>
+                <span class="section-text">Video Scoring</span>
+                <span class="section-subtitle">Upload & Live Webcam with ML Analysis</span>
             </button>
-            <button class="mode-btn" data-mode="training" id="trainingModeBtn">
-                <span class="mode-icon">🎓</span>
-                <span class="mode-text">AI Training</span>
-            </button>
-            <button class="mode-btn" data-mode="webcam" id="webcamModeBtn">
-                <span class="mode-icon">📹</span>
-                <span class="mode-text">Live Webcam</span>
+            <button class="section-btn" data-section="training" id="trainingSection">
+                <span class="section-icon">🎓</span>
+                <span class="section-text">AI Training</span>
+                <span class="section-subtitle">Real-time Coaching with Gemini AI</span>
             </button>
         </div>
+
+        <!-- Video Scoring Section -->
+        <div id="scoringContent" class="section-content active">
+            <!-- Mode Selection for Scoring -->
+            <div class="mode-selector">
+                <button class="mode-btn active" data-mode="upload" id="uploadModeBtn">
+                    <span class="mode-icon">📁</span>
+                    <span class="mode-text">Upload Video</span>
+                </button>
+                <button class="mode-btn" data-mode="webcam" id="webcamModeBtn">
+                    <span class="mode-icon">📹</span>
+                    <span class="mode-text">Live Webcam</span>
+                </button>
+            </div>
 
         <!-- Upload Mode -->
         <div id="uploadMode" class="mode-content active">
@@ -93,6 +105,14 @@
                         <div id="errorsList" class="errors-list"></div>
                     </div>
 
+                    <!-- Gemini AI Summary -->
+                    <div id="geminiSummary" class="gemini-summary-section" style="display: none;">
+                        <h3>🤖 AI Coach Summary</h3>
+                        <div id="geminiSummaryContent" class="gemini-summary-content">
+                            <div class="loading-spinner">Generating AI summary...</div>
+                        </div>
+                    </div>
+
                     <div class="video-download">
                         <button id="downloadBtn" class="download-btn">
                             <span>⬇️</span> Download Analyzed Video
@@ -105,8 +125,89 @@
             </div>
         </div>
 
-        <!-- AI Training Mode -->
-        <div id="trainingMode" class="mode-content">
+        <!-- Webcam Mode (ML Scoring) -->
+        <div id="webcamMode" class="mode-content">
+            <div class="webcam-section">
+                <div class="webcam-container">
+                    <div id="webcamPlaceholder" class="webcam-placeholder">
+                        <div class="webcam-icon">📹</div>
+                        <h3>Click "Start Webcam" to begin live analysis</h3>
+                        <p>Real-time feedback powered by AI</p>
+                        <button id="startWebcamBtn" class="start-btn">Start Webcam</button>
+                    </div>
+
+                    <div id="webcamActive" style="display: none;">
+                        <div class="video-panels">
+                            <div class="video-panel">
+                                <h4>Live Feed</h4>
+                                <video id="webcamVideo" autoplay playsinline></video>
+                                <canvas id="webcamCanvas" style="display: none;"></canvas>
+                            </div>
+                            <div class="video-panel">
+                                <h4>AI Analysis</h4>
+                                <img id="analyzedFrame" src="" alt="Analyzed frame">
+                                <div id="noAnalysis" class="no-analysis">
+                                    <p>Waiting for pose detection...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="webcam-controls">
+                            <button id="stopWebcamBtn" class="stop-btn">Stop Webcam</button>
+                            <div class="voice-toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="voiceToggle">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="toggle-label">🔊 Voice Feedback</span>
+                            </div>
+                            <div class="fps-indicator">
+                                FPS: <span id="fpsCounter">0</span>
+                            </div>
+                        </div>
+
+                        <div id="liveFeedback" class="live-feedback">
+                            <div class="feedback-header">
+                                <div class="skill-badge" id="liveSkill">-</div>
+                                <div class="score-badge" id="liveScore">-</div>
+                            </div>
+
+                            <div class="feedback-sections">
+                                <div class="feedback-section strengths">
+                                    <h4>✓ Strengths</h4>
+                                    <div id="liveStrengths" class="feedback-content">
+                                        <p class="placeholder">Perform a gymnastics move to see analysis...</p>
+                                    </div>
+                                </div>
+
+                                <div class="feedback-section corrections">
+                                    <h4>🎯 Corrections Needed</h4>
+                                    <div id="liveCorrections" class="feedback-content">
+                                        <p class="placeholder">No corrections yet...</p>
+                                    </div>
+                                </div>
+
+                                <div class="feedback-section tips">
+                                    <h4>💡 Coaching Tips</h4>
+                                    <div id="liveTips" class="feedback-content">
+                                        <p class="placeholder">Tips will appear here...</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="liveWarnings" class="warnings-section" style="display: none;">
+                                <h4>⚠️ Safety Warnings</h4>
+                                <div id="warningsList" class="warnings-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div> <!-- End of Video Scoring Section -->
+
+        <!-- AI Training Section -->
+        <div id="trainingContent" class="section-content">
             <div class="training-section">
                 <!-- Training Mode Selector -->
                 <div class="training-mode-selector">
@@ -315,87 +416,7 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Webcam Mode -->
-        <div id="webcamMode" class="mode-content">
-            <div class="webcam-section">
-                <div class="webcam-container">
-                    <div id="webcamPlaceholder" class="webcam-placeholder">
-                        <div class="webcam-icon">📹</div>
-                        <h3>Click "Start Webcam" to begin live analysis</h3>
-                        <p>Real-time feedback powered by AI</p>
-                        <button id="startWebcamBtn" class="start-btn">Start Webcam</button>
-                    </div>
-
-                    <div id="webcamActive" style="display: none;">
-                        <div class="video-panels">
-                            <div class="video-panel">
-                                <h4>Live Feed</h4>
-                                <video id="webcamVideo" autoplay playsinline></video>
-                                <canvas id="webcamCanvas" style="display: none;"></canvas>
-                            </div>
-                            <div class="video-panel">
-                                <h4>AI Analysis</h4>
-                                <img id="analyzedFrame" src="" alt="Analyzed frame">
-                                <div id="noAnalysis" class="no-analysis">
-                                    <p>Waiting for pose detection...</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="webcam-controls">
-                            <button id="stopWebcamBtn" class="stop-btn">Stop Webcam</button>
-                            <div class="voice-toggle-container">
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="voiceToggle">
-                                    <span class="toggle-slider"></span>
-                                </label>
-                                <span class="toggle-label">🔊 Voice Feedback</span>
-                            </div>
-                            <div class="fps-indicator">
-                                FPS: <span id="fpsCounter">0</span>
-                            </div>
-                        </div>
-
-                        <div id="liveFeedback" class="live-feedback">
-                            <div class="feedback-header">
-                                <div class="skill-badge" id="liveSkill">-</div>
-                                <div class="score-badge" id="liveScore">-</div>
-                            </div>
-
-                            <div class="feedback-sections">
-                                <div class="feedback-section strengths">
-                                    <h4>✓ Strengths</h4>
-                                    <div id="liveStrengths" class="feedback-content">
-                                        <p class="placeholder">Perform a gymnastics move to see analysis...</p>
-                                    </div>
-                                </div>
-
-                                <div class="feedback-section corrections">
-                                    <h4>🎯 Corrections Needed</h4>
-                                    <div id="liveCorrections" class="feedback-content">
-                                        <p class="placeholder">No corrections yet...</p>
-                                    </div>
-                                </div>
-
-                                <div class="feedback-section tips">
-                                    <h4>💡 Coaching Tips</h4>
-                                    <div id="liveTips" class="feedback-content">
-                                        <p class="placeholder">Tips will appear here...</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div id="liveWarnings" class="warnings-section" style="display: none;">
-                                <h4>⚠️ Safety Warnings</h4>
-                                <div id="warningsList" class="warnings-list"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </div> <!-- End of AI Training Section -->
 
         <!-- Footer -->
         <footer class="footer">

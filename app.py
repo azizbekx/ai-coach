@@ -378,6 +378,82 @@ async def analyze_webcam_frame(request: WebcamFrameRequest):
         raise HTTPException(status_code=500, detail=f"Error analyzing frame: {str(e)}")
 
 
+@app.post("/api/upload/summary")
+async def generate_upload_summary(request: Request):
+    """Generate Gemini AI summary for uploaded video analysis"""
+    try:
+        if not gemini_client:
+            return JSONResponse(content={
+                'success': False,
+                'message': 'Gemini API not available'
+            })
+
+        data = await request.json()
+        results = data.get('results', {})
+
+        # Create comprehensive prompt for Gemini
+        skill = results.get('detected_skill', 'general').replace('_', ' ').title()
+        avg_score = results.get('average_score', 0)
+        best_score = results.get('best_frame', {}).get('score', 0)
+        worst_score = results.get('worst_frame', {}).get('score', 0)
+        common_errors = results.get('common_errors', [])
+
+        errors_text = ""
+        if common_errors:
+            errors_text = "\n".join([f"- {error['error'].replace('_', ' ')}: occurred {error['count']} times"
+                                     for error in common_errors[:5]])
+        else:
+            errors_text = "No significant errors detected"
+
+        prompt = f"""You are an expert gymnastics coach providing a comprehensive video analysis summary.
+
+**Video Analysis Results:**
+- Detected Skill: {skill}
+- Average Score: {avg_score:.2f}/10.0
+- Best Performance: {best_score:.2f}/10.0
+- Lowest Performance: {worst_score:.2f}/10.0
+
+**Common Issues Found:**
+{errors_text}
+
+Based on this ML analysis data, please provide:
+
+1. **Overall Assessment** (2-3 sentences): Evaluate the athlete's performance level
+2. **Key Strengths** (2-3 points): What they're doing well based on the scores
+3. **Priority Improvements** (3-4 points): Most important areas to work on based on the errors
+4. **Training Recommendations** (2-3 suggestions): Specific exercises or drills to improve
+
+Keep your feedback:
+- Professional yet encouraging
+- Specific and actionable
+- Focused on technique improvement
+- Suitable for an athlete training for competitions
+
+Format your response clearly with headers and bullet points."""
+
+        # Call Gemini API
+        response = gemini_client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents=[prompt]
+        )
+
+        summary = response.text
+
+        return JSONResponse(content={
+            'success': True,
+            'summary': summary
+        })
+
+    except Exception as e:
+        print(f"Error generating Gemini summary: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={
+            'success': False,
+            'message': f'Error generating summary: {str(e)}'
+        })
+
+
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""

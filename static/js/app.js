@@ -19,13 +19,50 @@ class GymnasticsCoachApp {
     }
 
     init() {
+        this.setupSectionSelector();
         this.setupModeSelector();
         this.setupUploadMode();
         this.setupTrainingMode();
         this.setupWebcamMode();
     }
 
-    // Mode Selection
+    // Section Selection (Video Scoring vs AI Training)
+    setupSectionSelector() {
+        const sectionBtns = document.querySelectorAll('.section-btn');
+        sectionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const section = btn.dataset.section;
+                this.switchSection(section);
+            });
+        });
+    }
+
+    switchSection(section) {
+        // Update section buttons
+        document.querySelectorAll('.section-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.section === section);
+        });
+
+        // Update section content
+        document.querySelectorAll('.section-content').forEach(content => {
+            content.classList.remove('active');
+        });
+
+        const targetSection = document.getElementById(`${section}Content`);
+        if (targetSection) {
+            targetSection.classList.add('active');
+        }
+
+        // Stop any active streams when switching sections
+        if (section !== 'scoring' && this.webcamStream) {
+            this.stopWebcam();
+        }
+        if (section !== 'training' && this.trainingStream) {
+            this.stopTraining();
+        }
+    }
+
+    // Mode Selection (within sections)
     setupModeSelector() {
         const modeBtns = document.querySelectorAll('.mode-btn');
         modeBtns.forEach(btn => {
@@ -53,13 +90,8 @@ class GymnasticsCoachApp {
         }
 
         // Stop webcam if switching away
-        if (mode !== 'webcam' && mode !== 'training' && this.webcamStream) {
+        if (mode !== 'webcam' && this.webcamStream) {
             this.stopWebcam();
-        }
-
-        // Stop training if switching away
-        if (mode !== 'training' && this.trainingStream) {
-            this.stopTraining();
         }
 
         this.currentMode = mode;
@@ -193,11 +225,47 @@ class GymnasticsCoachApp {
             errorsList.innerHTML = '<p style="color: var(--text-muted);">No common errors detected</p>';
         }
 
+        // Generate Gemini AI Summary
+        this.generateGeminiSummary(results);
+
         // Download button
         const downloadBtn = document.getElementById('downloadBtn');
         downloadBtn.onclick = () => {
             window.location.href = data.output_video;
         };
+    }
+
+    async generateGeminiSummary(results) {
+        const summarySection = document.getElementById('geminiSummary');
+        const summaryContent = document.getElementById('geminiSummaryContent');
+
+        // Show section with loading state
+        summarySection.style.display = 'block';
+        summaryContent.innerHTML = '<div class="loading-spinner">🤖 Generating AI coaching summary...</div>';
+
+        try {
+            const response = await fetch('/api/upload/summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ results })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate summary');
+            }
+
+            const data = await response.json();
+
+            if (data.success && data.summary) {
+                summaryContent.innerHTML = `<div class="gemini-summary-text">${data.summary.replace(/\n/g, '<br>')}</div>`;
+            } else {
+                summaryContent.innerHTML = '<p style="color: var(--text-muted);">AI summary not available</p>';
+            }
+
+        } catch (error) {
+            console.error('Error generating Gemini summary:', error);
+            summaryContent.innerHTML = '<p style="color: var(--text-muted);">Could not generate AI summary. Ensure GEMINI_API_KEY is set.</p>';
+        }
     }
 
     resetUploadMode() {
