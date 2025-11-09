@@ -59,8 +59,7 @@ OUTPUT_FOLDER.mkdir(exist_ok=True)
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'webm'}
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
 
-# Mount static files and templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Templates configuration (must be before routes)
 templates = Jinja2Templates(directory="templates")
 
 # Initialize video processor (it creates its own pose estimator, analyzer, and feedback generator)
@@ -383,6 +382,10 @@ async def get_skills():
         })
 
     return {'skills': skills}
+
+
+# Mount static files AFTER all routes are defined
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 if __name__ == '__main__':
