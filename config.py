@@ -94,6 +94,228 @@ DEDUCTION_VALUES = {
 
 # Skill Learning Steps - Progressive coaching curriculum
 SKILL_LEARNING_STEPS = {
+    # ===== BASIC FUNDAMENTALS (Beginner-friendly single positions) =====
+    "standing_posture": {
+        "name": "Standing Posture",
+        "description": "Master proper standing alignment - the foundation of all gymnastics",
+        "difficulty": "beginner",
+        "steps": [
+            {
+                "name": "Feet Position",
+                "instruction": "Stand with feet hip-width apart, weight evenly distributed",
+                "coaching_cue": "Feel your weight balanced across both feet",
+                "requirements": {
+                    "torso_vertical": {
+                        "min": 85,
+                        "max": 95,
+                        "description": "Stand tall and upright"
+                    }
+                },
+                "common_mistakes": ["Leaning forward or back", "Uneven weight"],
+                "visual_cue": "Balanced standing"
+            },
+            {
+                "name": "Core Engagement",
+                "instruction": "Pull your belly button toward your spine, shoulders down and back",
+                "coaching_cue": "Engage your core, stand tall",
+                "requirements": {
+                    "torso_vertical": {
+                        "target": 90,
+                        "tolerance": 5,
+                        "description": "Perfect upright posture"
+                    },
+                    "left_shoulder": {
+                        "min": 170,
+                        "max": 180,
+                        "description": "Shoulders relaxed down"
+                    }
+                },
+                "common_mistakes": ["Shoulders hunched", "Core relaxed"],
+                "visual_cue": "Tall engaged posture"
+            }
+        ]
+    },
+    "plank_hold": {
+        "name": "Plank Hold",
+        "description": "Build core strength with the fundamental plank position",
+        "difficulty": "beginner",
+        "steps": [
+            {
+                "name": "Setup Position",
+                "instruction": "Start on hands and toes, hands under shoulders",
+                "coaching_cue": "Hands directly under shoulders",
+                "requirements": {
+                    "left_elbow": {
+                        "min": 170,
+                        "max": 180,
+                        "description": "Arms straight"
+                    },
+                    "right_elbow": {
+                        "min": 170,
+                        "max": 180,
+                        "description": "Arms straight"
+                    }
+                },
+                "common_mistakes": ["Bent elbows", "Hands too wide"],
+                "visual_cue": "Hands under shoulders"
+            },
+            {
+                "name": "Body Alignment",
+                "instruction": "Create a straight line from head to heels, engage core",
+                "coaching_cue": "One straight line, don't let hips sag",
+                "requirements": {
+                    "hip_angle": {
+                        "min": 165,
+                        "max": 180,
+                        "description": "Hips level with body"
+                    },
+                    "torso_vertical": {
+                        "min": 170,
+                        "max": 180,
+                        "description": "Body straight"
+                    }
+                },
+                "common_mistakes": ["Sagging hips", "Hips too high"],
+                "visual_cue": "Straight body line"
+            }
+        ]
+    },
+    "hollow_body": {
+        "name": "Hollow Body Hold",
+        "description": "Master the hollow body - the most important gymnastics position",
+        "difficulty": "beginner",
+        "steps": [
+            {
+                "name": "Lying Position",
+                "instruction": "Lie on your back, press lower back into floor",
+                "coaching_cue": "Flatten your back to the ground",
+                "requirements": {
+                    "torso_vertical": {
+                        "min": 0,
+                        "max": 20,
+                        "description": "Back on floor"
+                    }
+                },
+                "common_mistakes": ["Arched lower back"],
+                "visual_cue": "Flat back"
+            },
+            {
+                "name": "Arm and Leg Extension",
+                "instruction": "Extend arms overhead and legs straight, lift shoulders and feet slightly off ground",
+                "coaching_cue": "Create a hollow banana shape",
+                "requirements": {
+                    "left_knee": {
+                        "min": 170,
+                        "max": 180,
+                        "description": "Legs straight"
+                    },
+                    "left_shoulder": {
+                        "min": 160,
+                        "max": 180,
+                        "description": "Arms extended overhead"
+                    }
+                },
+                "common_mistakes": ["Bent knees", "Back arches off floor"],
+                "visual_cue": "Hollow banana shape"
+            }
+        ]
+    },
+    "wall_handstand": {
+        "name": "Wall Handstand Practice",
+        "description": "Learn handstand basics safely against a wall",
+        "difficulty": "beginner",
+        "steps": [
+            {
+                "name": "Hands Placement",
+                "instruction": "Place hands 6 inches from wall, fingers spread wide",
+                "coaching_cue": "Hands close to wall, strong foundation",
+                "requirements": {
+                    "left_shoulder": {
+                        "min": 150,
+                        "max": 180,
+                        "description": "Arms engaged"
+                    }
+                },
+                "common_mistakes": ["Hands too far from wall", "Fingers not spread"],
+                "visual_cue": "Hands near wall"
+            },
+            {
+                "name": "Kick Up",
+                "instruction": "Walk feet up wall, keep arms straight",
+                "coaching_cue": "Push through shoulders, walk up slowly",
+                "requirements": {
+                    "left_elbow": {
+                        "min": 170,
+                        "max": 180,
+                        "description": "Arms locked"
+                    },
+                    "shoulder_angle": {
+                        "min": 160,
+                        "max": 180,
+                        "description": "Shoulders extended"
+                    }
+                },
+                "common_mistakes": ["Bent arms", "Not pushing through shoulders"],
+                "visual_cue": "Straight arms, feet on wall"
+            },
+            {
+                "name": "Wall Handstand Position",
+                "instruction": "Hold position with stomach facing wall, body straight",
+                "coaching_cue": "Push floor away, squeeze core",
+                "requirements": {
+                    "shoulder_angle": {
+                        "target": 180,
+                        "tolerance": 10,
+                        "description": "Shoulders fully extended"
+                    },
+                    "hip_angle": {
+                        "min": 165,
+                        "max": 180,
+                        "description": "Hips extended"
+                    }
+                },
+                "common_mistakes": ["Banana back", "Not engaging shoulders"],
+                "visual_cue": "Straight wall handstand"
+            }
+        ]
+    },
+    "basic_stretch": {
+        "name": "Basic Flexibility Stretch",
+        "description": "Simple seated forward fold for flexibility",
+        "difficulty": "beginner",
+        "steps": [
+            {
+                "name": "Seated Position",
+                "instruction": "Sit with legs straight in front, toes pointed up",
+                "coaching_cue": "Sit tall, legs together and straight",
+                "requirements": {
+                    "left_knee": {
+                        "min": 170,
+                        "max": 180,
+                        "description": "Legs straight"
+                    }
+                },
+                "common_mistakes": ["Bent knees"],
+                "visual_cue": "Straight legs seated"
+            },
+            {
+                "name": "Forward Reach",
+                "instruction": "Reach forward toward toes, keep back straight",
+                "coaching_cue": "Hinge from hips, reach with control",
+                "requirements": {
+                    "hip_angle": {
+                        "min": 45,
+                        "max": 90,
+                        "description": "Folding forward"
+                    }
+                },
+                "common_mistakes": ["Rounding back too much", "Forcing stretch"],
+                "visual_cue": "Controlled forward fold"
+            }
+        ]
+    },
+
+    # ===== ADVANCED SKILLS =====
     "handstand": {
         "name": "Handstand",
         "description": "Master the fundamental inverted position with perfect balance and alignment",

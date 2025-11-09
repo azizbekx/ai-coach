@@ -200,11 +200,49 @@ class GymnasticsCoachApp {
             errorsList.innerHTML = '<p style="color: var(--text-muted);">No common errors detected</p>';
         }
 
+        // Display Gemini analysis if available
+        if (data.gemini_analysis && data.gemini_analysis.comprehensive_feedback) {
+            const geminiSection = document.getElementById('geminiAnalysis');
+            const geminiContent = document.getElementById('geminiContent');
+
+            geminiSection.style.display = 'block';
+
+            // Format Gemini markdown-like feedback
+            const feedback = data.gemini_analysis.comprehensive_feedback;
+            const formattedFeedback = this.formatGeminiFeedback(feedback);
+
+            geminiContent.innerHTML = formattedFeedback;
+        } else {
+            document.getElementById('geminiAnalysis').style.display = 'none';
+        }
+
         // Download button
         const downloadBtn = document.getElementById('downloadBtn');
         downloadBtn.onclick = () => {
             window.location.href = data.output_video;
         };
+    }
+
+    formatGeminiFeedback(feedback) {
+        // Convert markdown-like formatting to HTML
+        let formatted = feedback
+            // Bold headers
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            // Bullet points
+            .replace(/^- (.+)$/gm, '<li>$1</li>')
+            // Numbers
+            .replace(/^(\d+)\.\s+(.+)$/gm, '<div class="feedback-item"><span class="number">$1.</span> $2</div>')
+            // Line breaks
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>');
+
+        // Wrap in paragraphs
+        formatted = '<div class="gemini-feedback-text"><p>' + formatted + '</p></div>';
+
+        // Clean up empty paragraphs
+        formatted = formatted.replace(/<p><\/p>/g, '').replace(/<p><br>/g, '<p>');
+
+        return formatted;
     }
 
     resetUploadMode() {
@@ -611,25 +649,59 @@ class GymnasticsCoachApp {
             const skillsList = document.getElementById('skillsList');
             skillsList.innerHTML = '';
 
-            data.skills.forEach(skill => {
-                const skillCard = document.createElement('div');
-                skillCard.className = 'skill-card';
-                skillCard.innerHTML = `
-                    <div class="skill-icon">🤸</div>
-                    <h3>${skill.display_name}</h3>
-                    <p>${skill.description}</p>
-                    <div class="skill-meta">
-                        <span class="steps-count">${skill.total_steps} Steps</span>
-                    </div>
-                `;
-                skillCard.addEventListener('click', () => {
-                    this.selectSkill(skill.name);
+            // Group skills by difficulty
+            const beginnerSkills = data.skills.filter(s => s.difficulty === 'beginner');
+            const advancedSkills = data.skills.filter(s => !s.difficulty || s.difficulty !== 'beginner');
+
+            // Add beginner section
+            if (beginnerSkills.length > 0) {
+                const beginnerHeader = document.createElement('div');
+                beginnerHeader.className = 'skills-category-header';
+                beginnerHeader.innerHTML = '<h3>🌱 Basic Fundamentals (Start Here!)</h3>';
+                skillsList.appendChild(beginnerHeader);
+
+                beginnerSkills.forEach(skill => {
+                    this.createSkillCard(skill, skillsList, 'beginner');
                 });
-                skillsList.appendChild(skillCard);
-            });
+            }
+
+            // Add advanced section
+            if (advancedSkills.length > 0) {
+                const advancedHeader = document.createElement('div');
+                advancedHeader.className = 'skills-category-header';
+                advancedHeader.innerHTML = '<h3>🏆 Advanced Skills</h3>';
+                skillsList.appendChild(advancedHeader);
+
+                advancedSkills.forEach(skill => {
+                    this.createSkillCard(skill, skillsList, 'advanced');
+                });
+            }
         } catch (error) {
             console.error('Error loading coaching skills:', error);
         }
+    }
+
+    createSkillCard(skill, container, difficulty) {
+        const skillCard = document.createElement('div');
+        skillCard.className = `skill-card skill-${difficulty}`;
+
+        const difficultyBadge = difficulty === 'beginner'
+            ? '<span class="difficulty-badge beginner">Beginner</span>'
+            : '<span class="difficulty-badge advanced">Advanced</span>';
+
+        skillCard.innerHTML = `
+            <div class="skill-icon">🤸</div>
+            ${difficultyBadge}
+            <h3>${skill.display_name}</h3>
+            <p>${skill.description}</p>
+            <div class="skill-meta">
+                <span class="steps-count">${skill.total_steps} Steps</span>
+            </div>
+        `;
+        skillCard.addEventListener('click', () => {
+            this.selectSkill(skill.name);
+        });
+        container.appendChild(skillCard);
     }
 
     async selectSkill(skillName) {

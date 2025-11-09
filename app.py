@@ -11,6 +11,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import uvicorn
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
@@ -565,7 +569,8 @@ async def get_coaching_skills():
             'name': skill_name,
             'display_name': skill_data['name'],
             'description': skill_data['description'],
-            'total_steps': len(skill_data['steps'])
+            'total_steps': len(skill_data['steps']),
+            'difficulty': skill_data.get('difficulty', 'advanced')  # Default to advanced if not specified
         })
 
     return {'skills': skills}
