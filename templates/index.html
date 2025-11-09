@@ -21,11 +21,15 @@
         <div class="mode-selector">
             <button class="mode-btn active" data-mode="upload" id="uploadModeBtn">
                 <span class="mode-icon">📁</span>
-                <span class="mode-text">Upload Video</span>
+                <span class="mode-text">Upload & Score</span>
             </button>
             <button class="mode-btn" data-mode="webcam" id="webcamModeBtn">
                 <span class="mode-icon">📹</span>
-                <span class="mode-text">Live Webcam</span>
+                <span class="mode-text">Live Analysis</span>
+            </button>
+            <button class="mode-btn" data-mode="coaching" id="coachingModeBtn">
+                <span class="mode-icon">🎓</span>
+                <span class="mode-text">AI Coach</span>
             </button>
         </div>
 
@@ -174,6 +178,116 @@
                             <div id="liveWarnings" class="warnings-section" style="display: none;">
                                 <h4>⚠️ Safety Warnings</h4>
                                 <div id="warningsList" class="warnings-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coaching Mode -->
+        <div id="coachingMode" class="mode-content">
+            <div class="coaching-section">
+                <!-- Skill Selection -->
+                <div id="skillSelection" class="skill-selection">
+                    <h2>Choose a Skill to Learn</h2>
+                    <p class="coaching-intro">I'll guide you step-by-step through mastering gymnastics skills</p>
+                    <div id="skillsList" class="skills-grid">
+                        <!-- Skills will be loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Active Coaching -->
+                <div id="activeCoaching" style="display: none;">
+                    <!-- Progress Header -->
+                    <div class="coaching-header">
+                        <div class="skill-title">
+                            <button id="exitCoachingBtn" class="icon-btn">← Back</button>
+                            <h2 id="coachingSkillName">-</h2>
+                        </div>
+                        <div class="step-progress">
+                            <div class="progress-bar-container">
+                                <div id="stepProgressBar" class="step-progress-fill" style="width: 0%"></div>
+                            </div>
+                            <p class="progress-text">
+                                Step <span id="currentStepNum">1</span> of <span id="totalStepsNum">5</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Video and Instructions Side by Side -->
+                    <div class="coaching-main">
+                        <!-- Video Feed -->
+                        <div class="coaching-video-container">
+                            <div id="coachingPlaceholder" class="coaching-placeholder">
+                                <div class="placeholder-icon">📹</div>
+                                <h3>Click "Start Coaching" to begin</h3>
+                                <button id="startCoachingBtn" class="start-btn">Start Coaching</button>
+                            </div>
+
+                            <div id="coachingVideoActive" style="display: none;">
+                                <video id="coachingVideo" autoplay playsinline></video>
+                                <canvas id="coachingCanvas" style="display: none;"></canvas>
+                                <img id="coachingAnalyzedFrame" src="" alt="Analysis">
+
+                                <div class="coaching-controls">
+                                    <button id="stopCoachingBtn" class="stop-btn">Stop</button>
+                                    <div class="voice-toggle-container">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="coachingVoiceToggle" checked>
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                        <span class="toggle-label">🔊 Voice Coaching</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Coaching Instructions -->
+                        <div class="coaching-instructions">
+                            <div class="current-step">
+                                <h3 id="stepName">-</h3>
+                                <div class="instruction-box">
+                                    <p class="instruction-label">📋 Instruction:</p>
+                                    <p id="stepInstruction">-</p>
+                                </div>
+                                <div class="coaching-cue-box">
+                                    <p class="cue-label">💡 Focus:</p>
+                                    <p id="stepCoachingCue">-</p>
+                                </div>
+                            </div>
+
+                            <!-- Real-time Feedback -->
+                            <div id="coachingFeedback" class="coaching-feedback">
+                                <h4>AI Coach Says:</h4>
+                                <div id="aiCoachMessage" class="ai-message">
+                                    <p>Position yourself and I'll guide you...</p>
+                                </div>
+
+                                <!-- Step Checks -->
+                                <div id="stepChecks" class="step-checks">
+                                    <!-- Requirements will be shown here -->
+                                </div>
+
+                                <!-- Action Button -->
+                                <div class="coaching-action">
+                                    <button id="nextStepBtn" class="next-step-btn" style="display: none;">
+                                        Next Step →
+                                    </button>
+                                    <p id="attemptsCount" class="attempts-text"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Completion Celebration -->
+                    <div id="completionModal" class="modal" style="display: none;">
+                        <div class="modal-content celebration">
+                            <h2>🎉 Congratulations!</h2>
+                            <p id="completionMessage">You've mastered this skill!</p>
+                            <div class="completion-actions">
+                                <button id="tryAnotherSkillBtn" class="primary-btn">Try Another Skill</button>
+                                <button id="practiceAgainBtn" class="secondary-btn">Practice Again</button>
                             </div>
                         </div>
                     </div>

@@ -15,6 +15,13 @@ class GymnasticsCoachApp {
         this.lastSpokenFeedback = '';
         this.speakCooldown = false;
 
+        // Coaching mode state
+        this.coachingStream = null;
+        this.coachingInterval = null;
+        this.currentSkill = null;
+        this.currentSession = 'default';
+        this.coachingActive = false;
+
         this.init();
     }
 
@@ -22,6 +29,7 @@ class GymnasticsCoachApp {
         this.setupModeSelector();
         this.setupUploadMode();
         this.setupWebcamMode();
+        this.setupCoachingMode();
     }
 
     // Mode Selection
@@ -54,6 +62,11 @@ class GymnasticsCoachApp {
         // Stop webcam if switching away
         if (mode !== 'webcam' && this.webcamStream) {
             this.stopWebcam();
+        }
+
+        // Stop coaching if switching away
+        if (mode !== 'coaching' && this.coachingActive) {
+            this.stopCoaching();
         }
 
         this.currentMode = mode;
@@ -549,6 +562,371 @@ class GymnasticsCoachApp {
         }
 
         return spokenText;
+    }
+
+    // Coaching Mode
+    setupCoachingMode() {
+        this.loadCoachingSkills();
+
+        // Exit coaching button
+        document.getElementById('exitCoachingBtn')?.addEventListener('click', () => {
+            this.exitActiveCoaching();
+        });
+
+        // Start coaching button
+        document.getElementById('startCoachingBtn')?.addEventListener('click', () => {
+            this.startCoachingWebcam();
+        });
+
+        // Stop coaching button
+        document.getElementById('stopCoachingBtn')?.addEventListener('click', () => {
+            this.stopCoaching();
+        });
+
+        // Next step button
+        document.getElementById('nextStepBtn')?.addEventListener('click', () => {
+            this.advanceToNextStep();
+        });
+
+        // Voice toggle for coaching
+        document.getElementById('coachingVoiceToggle')?.addEventListener('change', (e) => {
+            this.voiceEnabled = e.target.checked;
+        });
+
+        // Completion modal buttons
+        document.getElementById('tryAnotherSkillBtn')?.addEventListener('click', () => {
+            this.exitActiveCoaching();
+        });
+
+        document.getElementById('practiceAgainBtn')?.addEventListener('click', () => {
+            this.restartCoaching();
+        });
+    }
+
+    async loadCoachingSkills() {
+        try {
+            const response = await fetch('/api/coaching/skills');
+            const data = await response.json();
+
+            const skillsList = document.getElementById('skillsList');
+            skillsList.innerHTML = '';
+
+            data.skills.forEach(skill => {
+                const skillCard = document.createElement('div');
+                skillCard.className = 'skill-card';
+                skillCard.innerHTML = `
+                    <div class="skill-icon">🤸</div>
+                    <h3>${skill.display_name}</h3>
+                    <p>${skill.description}</p>
+                    <div class="skill-meta">
+                        <span class="steps-count">${skill.total_steps} Steps</span>
+                    </div>
+                `;
+                skillCard.addEventListener('click', () => {
+                    this.selectSkill(skill.name);
+                });
+                skillsList.appendChild(skillCard);
+            });
+        } catch (error) {
+            console.error('Error loading coaching skills:', error);
+        }
+    }
+
+    async selectSkill(skillName) {
+        try {
+            // Start coaching session
+            const response = await fetch('/api/coaching/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    skill: skillName,
+                    session_id: this.currentSession
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.currentSkill = data;
+
+                // Show active coaching interface
+                document.getElementById('skillSelection').style.display = 'none';
+                document.getElementById('activeCoaching').style.display = 'block';
+
+                // Update UI
+                document.getElementById('coachingSkillName').textContent = data.skill_name;
+                document.getElementById('totalStepsNum').textContent = data.total_steps;
+                this.updateStepDisplay(data.step_info, 1, data.total_steps);
+
+                // Show welcome message
+                this.showCoachingMessage(data.welcome_message);
+            }
+        } catch (error) {
+            console.error('Error starting coaching session:', error);
+            alert('Failed to start coaching session');
+        }
+    }
+
+    async startCoachingWebcam() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480 }
+            });
+
+            this.coachingStream = stream;
+            const video = document.getElementById('coachingVideo');
+            video.srcObject = stream;
+
+            // Show video active UI
+            document.getElementById('coachingPlaceholder').style.display = 'none';
+            document.getElementById('coachingVideoActive').style.display = 'block';
+
+            this.coachingActive = true;
+
+            // Enable voice by default
+            this.voiceEnabled = document.getElementById('coachingVoiceToggle').checked;
+
+            // Start analysis loop
+            this.coachingInterval = setInterval(() => {
+                this.analyzeCoachingFrame();
+            }, 1000); // Analyze every second
+
+        } catch (error) {
+            console.error('Error starting coaching webcam:', error);
+            alert('Could not access webcam');
+        }
+    }
+
+    async analyzeCoachingFrame() {
+        const video = document.getElementById('coachingVideo');
+        const canvas = document.getElementById('coachingCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // Draw current frame
+        ctx.drawImage(video, 0, 0);
+
+        // Convert to base64
+        const frameData = canvas.toDataURL('image/jpeg');
+
+        try {
+            const response = await fetch('/api/coaching/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    frame: frameData,
+                    session_id: this.currentSession
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.pose_detected) {
+                // Update analyzed frame
+                document.getElementById('coachingAnalyzedFrame').src = data.annotated_frame;
+
+                // Update step info
+                const stepInfo = data.step_info;
+                this.updateStepDisplay(
+                    stepInfo,
+                    stepInfo.step_number,
+                    stepInfo.total_steps
+                );
+
+                // Update evaluation
+                const evaluation = data.evaluation;
+                this.updateStepChecks(evaluation.checks);
+
+                // Show coaching feedback
+                const coachingMsg = data.gemini_coaching || evaluation.feedback;
+                this.showCoachingMessage(coachingMsg);
+
+                // Speak coaching feedback
+                if (this.voiceEnabled && data.audio_text) {
+                    this.speakCoaching(data.audio_text);
+                }
+
+                // Show next step button if completed
+                const nextBtn = document.getElementById('nextStepBtn');
+                if (evaluation.step_completed) {
+                    nextBtn.style.display = 'block';
+                } else {
+                    nextBtn.style.display = 'none';
+                }
+
+                // Update attempts count
+                document.getElementById('attemptsCount').textContent =
+                    `Attempt #${evaluation.attempts}`;
+            }
+        } catch (error) {
+            console.error('Error analyzing coaching frame:', error);
+        }
+    }
+
+    updateStepDisplay(stepInfo, stepNumber, totalSteps) {
+        document.getElementById('currentStepNum').textContent = stepNumber;
+        document.getElementById('stepName').textContent = stepInfo.name;
+        document.getElementById('stepInstruction').textContent = stepInfo.instruction;
+        document.getElementById('stepCoachingCue').textContent = stepInfo.coaching_cue;
+
+        // Update progress bar
+        const progress = (stepNumber / totalSteps) * 100;
+        document.getElementById('stepProgressBar').style.width = `${progress}%`;
+    }
+
+    updateStepChecks(checks) {
+        const checksContainer = document.getElementById('stepChecks');
+        checksContainer.innerHTML = '';
+
+        checks.forEach(check => {
+            const checkEl = document.createElement('div');
+            checkEl.className = `check-item ${check.status}`;
+
+            const icon = check.status === 'passed' ? '✓' :
+                         check.status === 'failed' ? '✗' : '?';
+
+            checkEl.innerHTML = `
+                <span class="check-icon">${icon}</span>
+                <span class="check-message">${check.message}</span>
+            `;
+            checksContainer.appendChild(checkEl);
+        });
+    }
+
+    showCoachingMessage(message) {
+        const messageEl = document.getElementById('aiCoachMessage');
+        messageEl.innerHTML = `<p>${message}</p>`;
+    }
+
+    speakCoaching(text) {
+        // Don't spam voice feedback
+        if (this.speakCooldown || this.lastSpokenFeedback === text) {
+            return;
+        }
+
+        // Cancel any ongoing speech
+        this.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        this.currentUtterance = utterance;
+        this.lastSpokenFeedback = text;
+        this.speechSynthesis.speak(utterance);
+
+        // Cooldown period
+        this.speakCooldown = true;
+        setTimeout(() => {
+            this.speakCooldown = false;
+        }, 3000);
+    }
+
+    async advanceToNextStep() {
+        try {
+            const response = await fetch('/api/coaching/next-step', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: this.currentSession
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                if (data.completed) {
+                    // Show completion modal
+                    this.showCompletionModal(data.message);
+                } else {
+                    // Update to next step
+                    this.updateStepDisplay(
+                        data.step_info,
+                        data.step_number,
+                        data.total_steps
+                    );
+
+                    // Show encouragement
+                    this.showCoachingMessage(data.encouragement);
+
+                    if (this.voiceEnabled) {
+                        this.speakCoaching(data.encouragement);
+                    }
+
+                    // Hide next step button
+                    document.getElementById('nextStepBtn').style.display = 'none';
+
+                    // Reset attempts count
+                    document.getElementById('attemptsCount').textContent = '';
+                }
+            }
+        } catch (error) {
+            console.error('Error advancing to next step:', error);
+        }
+    }
+
+    showCompletionModal(message) {
+        document.getElementById('completionMessage').textContent = message;
+        document.getElementById('completionModal').style.display = 'flex';
+
+        // Stop coaching
+        this.stopCoaching();
+
+        // Speak completion message
+        if (this.voiceEnabled) {
+            this.speakCoaching(message);
+        }
+    }
+
+    exitActiveCoaching() {
+        // Stop coaching if active
+        if (this.coachingActive) {
+            this.stopCoaching();
+        }
+
+        // Show skill selection
+        document.getElementById('activeCoaching').style.display = 'none';
+        document.getElementById('skillSelection').style.display = 'block';
+
+        // Hide completion modal if visible
+        document.getElementById('completionModal').style.display = 'none';
+    }
+
+    stopCoaching() {
+        // Stop webcam stream
+        if (this.coachingStream) {
+            this.coachingStream.getTracks().forEach(track => track.stop());
+            this.coachingStream = null;
+        }
+
+        // Stop analysis interval
+        if (this.coachingInterval) {
+            clearInterval(this.coachingInterval);
+            this.coachingInterval = null;
+        }
+
+        // Update UI
+        document.getElementById('coachingVideoActive').style.display = 'none';
+        document.getElementById('coachingPlaceholder').style.display = 'block';
+
+        this.coachingActive = false;
+
+        // Cancel any speech
+        this.speechSynthesis.cancel();
+    }
+
+    async restartCoaching() {
+        // Hide completion modal
+        document.getElementById('completionModal').style.display = 'none';
+
+        // Restart the same skill
+        if (this.currentSkill) {
+            await this.selectSkill(this.currentSkill.skill);
+        }
     }
 }
 

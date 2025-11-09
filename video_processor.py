@@ -29,7 +29,8 @@ class VideoProcessor:
         output_path: Optional[str] = None,
         show_preview: bool = False,
         analyze_every_n_frames: int = 1,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
+        capture_key_frames: bool = False
     ) -> Dict:
         """
         Process a video file and generate analysis.
@@ -40,6 +41,7 @@ class VideoProcessor:
             show_preview: Whether to show live preview
             analyze_every_n_frames: Analyze every N frames (1 = all frames)
             progress_callback: Optional callback function for progress updates
+            capture_key_frames: Whether to capture and return best/worst frames
 
         Returns:
             Dictionary with analysis results and statistics
@@ -66,8 +68,10 @@ class VideoProcessor:
         frame_count = 0
         best_frame = None
         best_score = 0.0
+        best_frame_image = None  # Store actual frame for Gemini
         worst_frame = None
         worst_score = 10.0
+        worst_frame_image = None  # Store actual frame for Gemini
 
         print(f"Processing video: {video_path}")
         print(f"Total frames: {total_frames}, FPS: {fps}")
@@ -108,6 +112,9 @@ class VideoProcessor:
                                 'analysis': analysis,
                                 'timestamp': frame_count / fps
                             }
+                            # Capture frame image for Gemini analysis
+                            if capture_key_frames:
+                                best_frame_image = frame.copy()
 
                         if analysis['score'] < worst_score:
                             worst_score = analysis['score']
@@ -116,6 +123,9 @@ class VideoProcessor:
                                 'analysis': analysis,
                                 'timestamp': frame_count / fps
                             }
+                            # Capture frame image for Gemini analysis
+                            if capture_key_frames:
+                                worst_frame_image = frame.copy()
 
                         # Generate feedback
                         feedback = self.feedback_generator.generate_feedback(analysis)
@@ -168,6 +178,11 @@ class VideoProcessor:
             total_frames,
             fps
         )
+
+        # Add captured frame images if requested
+        if capture_key_frames:
+            results['best_frame_image'] = best_frame_image
+            results['worst_frame_image'] = worst_frame_image
 
         print("\n" + "=" * 60)
         print("PROCESSING COMPLETE")

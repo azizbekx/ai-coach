@@ -24,6 +24,7 @@ import numpy as np
 from typing import Optional
 
 from video_processor import VideoProcessor
+from coaching_engine import CoachingEngine
 
 # Gemini Vision API (optional)
 try:
@@ -65,6 +66,9 @@ templates = Jinja2Templates(directory="templates")
 # Initialize video processor (it creates its own pose estimator, analyzer, and feedback generator)
 video_processor = VideoProcessor()
 
+# Initialize coaching engine
+coaching_engine = CoachingEngine()
+
 # Initialize Gemini client (optional)
 gemini_client = None
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -102,6 +106,20 @@ class WebcamAnalysisResponse(BaseModel):
     message: Optional[str] = None
 
 
+class CoachingStartRequest(BaseModel):
+    skill: str
+    session_id: Optional[str] = "default"
+
+
+class CoachingFrameRequest(BaseModel):
+    frame: str
+    session_id: Optional[str] = "default"
+
+
+class CoachingAdvanceRequest(BaseModel):
+    session_id: Optional[str] = "default"
+
+
 def allowed_file(filename: str) -> bool:
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -109,7 +127,7 @@ def allowed_file(filename: str) -> bool:
 
 def get_gemini_feedback(frame: np.ndarray, skill: str, score: float) -> Optional[dict]:
     """
-    Get enhanced feedback from Gemini Vision API
+    Get enhanced feedback from Gemini Vision API for real-time analysis
 
     Args:
         frame: Image frame (BGR numpy array)
@@ -166,6 +184,141 @@ Keep feedback brief and focused on immediate actionable improvements."""
         return None
 
 
+def get_gemini_video_analysis(
+    video_path: str,
+    results: dict,
+    best_frame: Optional[np.ndarray] = None,
+    worst_frame: Optional[np.ndarray] = None
+) -> Optional[dict]:
+    """
+    Get comprehensive Gemini analysis for uploaded video performance
+
+    Args:
+        video_path: Path to analyzed video
+        results: Analysis results from video processor
+        best_frame: Best performing frame (optional)
+        worst_frame: Worst performing frame (optional)
+
+    Returns:
+        Comprehensive feedback dictionary or None
+    """
+    if not gemini_client:
+        return None
+
+    try:
+        # Prepare frames for analysis
+        frames_data = []
+
+        # Add best frame if available
+        if best_frame is not None:
+            frame_rgb = cv2.cvtColor(best_frame, cv2.COLOR_BGR2RGB)
+            _, buffer = cv2.imencode('.jpg', frame_rgb)
+            frames_data.append({
+                'data': buffer.tobytes(),
+                'label': 'Best Performance Frame'
+            })
+
+        # Add worst frame if available
+        if worst_frame is not None:
+            frame_rgb = cv2.cvtColor(worst_frame, cv2.COLOR_BGR2RGB)
+            _, buffer = cv2.imencode('.jpg', frame_rgb)
+            frames_data.append({
+                'data': buffer.tobytes(),
+                'label': 'Frame Needing Improvement'
+            })
+
+        if not frames_data:
+            return None
+
+        # Build comprehensive prompt
+        skill = results.get('detected_skill', 'general gymnastics')
+        avg_score = results.get('average_score', 0.0)
+        best_score = results.get('best_score', 0.0)
+        worst_score = results.get('worst_score', 0.0)
+        common_errors = results.get('common_errors', {})
+
+        # Format common errors
+        error_list = "\n".join([f"  - {error}: {count} occurrences"
+                                for error, count in sorted(common_errors.items(),
+                                                          key=lambda x: x[1],
+                                                          reverse=True)[:5]])
+
+        prompt = f"""You are an Olympic-level gymnastics coach analyzing a complete performance video.
+
+## Performance Summary
+- Skill: {skill.upper()}
+- Average Score: {avg_score:.1f}/10.0
+- Best Score: {best_score:.1f}/10.0
+- Worst Score: {worst_score:.1f}/10.0
+- Total Frames Analyzed: {results.get('analyzed_frames', 0)}
+
+## Most Common Errors
+{error_list if error_list else "  None detected"}
+
+## Analysis Request
+Based on the attached frames (best and worst moments), please provide:
+
+1. **Overall Performance Assessment** (2-3 sentences)
+   - What is their current skill level?
+   - What stands out about their performance?
+
+2. **Key Strengths** (2-3 bullet points)
+   - What are they doing well consistently?
+   - Which technical elements are strong?
+
+3. **Priority Corrections** (3-4 bullet points)
+   - What are the most important things to fix?
+   - Be specific and actionable
+   - Prioritize by impact on score and safety
+
+4. **Training Recommendations** (2-3 bullet points)
+   - What drills or exercises should they focus on?
+   - How can they improve fastest?
+
+5. **Safety Notes** (if any)
+   - Any injury risks you observe?
+   - Form issues that could lead to injury?
+
+Keep feedback practical, encouraging, and focused on improvement. Be direct but supportive.
+"""
+
+        # Build content list for Gemini
+        content_parts = []
+
+        # Add frames
+        for frame_info in frames_data:
+            content_parts.append(types.Part.from_bytes(
+                data=frame_info['data'],
+                mime_type='image/jpeg'
+            ))
+
+        # Add prompt
+        content_parts.append(prompt)
+
+        # Call Gemini Vision API
+        response = gemini_client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents=content_parts
+        )
+
+        return {
+            'comprehensive_feedback': response.text,
+            'source': 'gemini-video-analysis',
+            'analyzed_skill': skill,
+            'scores': {
+                'average': avg_score,
+                'best': best_score,
+                'worst': worst_score
+            }
+        }
+
+    except Exception as e:
+        print(f"Gemini video analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serve the main application page"""
@@ -212,11 +365,23 @@ async def upload_video(video: UploadFile = File(...)):
             str(input_path),
             str(output_path),
             show_preview=False,
-            analyze_every_n_frames=1
+            analyze_every_n_frames=1,
+            capture_key_frames=True  # Capture best/worst frames for Gemini
         )
 
         # Clean up input file
         input_path.unlink()
+
+        # Get comprehensive Gemini feedback if available
+        gemini_analysis = None
+        if gemini_client and results.get('best_frame_image') is not None:
+            print("Generating comprehensive Gemini feedback...")
+            gemini_analysis = get_gemini_video_analysis(
+                str(input_path),
+                results,
+                best_frame=results.get('best_frame_image'),
+                worst_frame=results.get('worst_frame_image')
+            )
 
         # Prepare response with detailed results
         response_data = {
@@ -241,6 +406,11 @@ async def upload_video(video: UploadFile = File(...)):
                 'common_errors': results.get('common_errors', [])
             }
         }
+
+        # Add Gemini comprehensive feedback if available
+        if gemini_analysis:
+            response_data['gemini_analysis'] = gemini_analysis
+            print("✅ Gemini comprehensive feedback generated")
 
         return JSONResponse(content=response_data)
 
@@ -382,6 +552,191 @@ async def get_skills():
         })
 
     return {'skills': skills}
+
+
+@app.get("/api/coaching/skills")
+async def get_coaching_skills():
+    """Get list of skills available for coaching with learning steps"""
+    from config import SKILL_LEARNING_STEPS
+
+    skills = []
+    for skill_name, skill_data in SKILL_LEARNING_STEPS.items():
+        skills.append({
+            'name': skill_name,
+            'display_name': skill_data['name'],
+            'description': skill_data['description'],
+            'total_steps': len(skill_data['steps'])
+        })
+
+    return {'skills': skills}
+
+
+@app.post("/api/coaching/start")
+async def start_coaching(request: CoachingStartRequest):
+    """Start a new coaching session for a skill"""
+    try:
+        result = coaching_engine.start_coaching_session(
+            skill=request.skill,
+            session_id=request.session_id
+        )
+
+        if not result.get('success'):
+            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to start session'))
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error starting coaching session: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/coaching/analyze")
+async def analyze_coaching_frame(request: CoachingFrameRequest):
+    """Analyze a frame for step-by-step coaching"""
+    try:
+        if not request.frame:
+            raise HTTPException(status_code=400, detail="No frame data provided")
+
+        # Decode base64 image
+        frame_data = request.frame.split(',')[1] if ',' in request.frame else request.frame
+        frame_bytes = base64.b64decode(frame_data)
+
+        # Convert to numpy array
+        nparr = np.frombuffer(frame_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if frame is None:
+            raise HTTPException(status_code=400, detail="Failed to decode frame")
+
+        # Get current step info
+        step_info_result = coaching_engine.get_current_step(request.session_id)
+        if not step_info_result:
+            raise HTTPException(status_code=400, detail="No active coaching session")
+
+        if step_info_result.get('completed'):
+            return {
+                'success': True,
+                'completed': True,
+                'message': step_info_result['message']
+            }
+
+        # Process frame with pose estimation
+        result = video_processor.process_frame(frame, draw_annotations=True)
+
+        if not result.get('pose_detected'):
+            return {
+                'success': False,
+                'pose_detected': False,
+                'message': 'No pose detected. Make sure you are fully visible in the camera.'
+            }
+
+        # Evaluate step completion
+        angles = result.get('angles', {})
+        evaluation = coaching_engine.evaluate_step_completion(
+            angles=angles,
+            session_id=request.session_id
+        )
+
+        # Get Gemini coaching feedback
+        step_info = step_info_result['step_info']
+        gemini_coaching = None
+
+        if gemini_client:
+            try:
+                skill = step_info_result['skill']
+                prompt = coaching_engine.get_gemini_coaching_prompt(
+                    skill=skill,
+                    step_info=step_info,
+                    angles=angles,
+                    evaluation=evaluation
+                )
+
+                # Get Gemini feedback
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                _, buffer = cv2.imencode('.jpg', frame_rgb)
+                image_bytes = buffer.tobytes()
+
+                response = gemini_client.models.generate_content(
+                    model='gemini-2.0-flash-exp',
+                    contents=[
+                        types.Part.from_bytes(
+                            data=image_bytes,
+                            mime_type='image/jpeg'
+                        ),
+                        prompt
+                    ]
+                )
+
+                gemini_coaching = response.text
+
+            except Exception as e:
+                print(f"Gemini coaching error: {e}")
+                gemini_coaching = None
+
+        # Encode annotated frame
+        _, buffer = cv2.imencode('.jpg', result['frame'])
+        annotated_base64 = base64.b64encode(buffer).decode('utf-8')
+
+        # Build response
+        response_data = {
+            'success': True,
+            'pose_detected': True,
+            'annotated_frame': f'data:image/jpeg;base64,{annotated_base64}',
+            'step_info': {
+                'step_number': step_info_result['step_number'],
+                'total_steps': step_info_result['total_steps'],
+                'name': step_info['name'],
+                'instruction': step_info['instruction'],
+                'coaching_cue': step_info['coaching_cue']
+            },
+            'evaluation': {
+                'step_completed': evaluation['step_completed'],
+                'checks': evaluation['checks'],
+                'feedback': evaluation['feedback'],
+                'attempts': evaluation['attempts']
+            }
+        }
+
+        # Add Gemini coaching if available
+        if gemini_coaching:
+            response_data['gemini_coaching'] = gemini_coaching
+            response_data['audio_text'] = gemini_coaching  # For TTS
+        else:
+            response_data['audio_text'] = evaluation['feedback']  # Fallback to basic feedback
+
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error analyzing coaching frame: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/coaching/next-step")
+async def advance_coaching_step(request: CoachingAdvanceRequest):
+    """Advance to the next step in the coaching progression"""
+    try:
+        result = coaching_engine.advance_to_next_step(request.session_id)
+
+        if not result.get('success'):
+            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to advance'))
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error advancing coaching step: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Mount static files AFTER all routes are defined
