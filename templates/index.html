@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Gymnastics Coach - Olympic Training System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🤸</span>
+                <h1>AI Gymnastics Coach</h1>
+            </div>
+            <p class="tagline">Olympic-Level Training System with Computer Vision</p>
+        </header>
+
+        <!-- Mode Selection -->
+        <div class="mode-selector">
+            <button class="mode-btn active" data-mode="upload" id="uploadModeBtn">
+                <span class="mode-icon">📁</span>
+                <span class="mode-text">Upload Video</span>
+            </button>
+            <button class="mode-btn" data-mode="webcam" id="webcamModeBtn">
+                <span class="mode-icon">📹</span>
+                <span class="mode-text">Live Webcam</span>
+            </button>
+        </div>
+
+        <!-- Upload Mode -->
+        <div id="uploadMode" class="mode-content active">
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📹</div>
+                    <h3>Drop your gymnastics video here</h3>
+                    <p>or click to browse</p>
+                    <p class="file-info">Supported formats: MP4, AVI, MOV, MKV, WebM (max 500MB)</p>
+                    <input type="file" id="videoInput" accept="video/*" hidden>
+                </div>
+
+                <div id="uploadProgress" class="upload-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p id="progressText">Processing video...</p>
+                </div>
+
+                <div id="uploadResults" class="results-section" style="display: none;">
+                    <h2>Analysis Results</h2>
+
+                    <div class="score-overview">
+                        <div class="score-card">
+                            <div class="score-label">Average Score</div>
+                            <div class="score-value" id="avgScore">-</div>
+                        </div>
+                        <div class="score-card">
+                            <div class="score-label">Best Performance</div>
+                            <div class="score-value" id="bestScore">-</div>
+                        </div>
+                        <div class="score-card">
+                            <div class="score-label">Needs Work</div>
+                            <div class="score-value" id="worstScore">-</div>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Detected Skill:</span>
+                            <span class="stat-value" id="detectedSkill">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Analyzed Frames:</span>
+                            <span class="stat-value" id="analyzedFrames">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Total Frames:</span>
+                            <span class="stat-value" id="totalFrames">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">FPS:</span>
+                            <span class="stat-value" id="videoFps">-</span>
+                        </div>
+                    </div>
+
+                    <div id="commonErrors" class="errors-section">
+                        <h3>Most Common Errors</h3>
+                        <div id="errorsList" class="errors-list"></div>
+                    </div>
+
+                    <div class="video-download">
+                        <button id="downloadBtn" class="download-btn">
+                            <span>⬇️</span> Download Analyzed Video
+                        </button>
+                        <button id="newAnalysisBtn" class="secondary-btn">
+                            Analyze Another Video
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Webcam Mode -->
+        <div id="webcamMode" class="mode-content">
+            <div class="webcam-section">
+                <div class="webcam-container">
+                    <div id="webcamPlaceholder" class="webcam-placeholder">
+                        <div class="webcam-icon">📹</div>
+                        <h3>Click "Start Webcam" to begin live analysis</h3>
+                        <p>Real-time feedback powered by AI</p>
+                        <button id="startWebcamBtn" class="start-btn">Start Webcam</button>
+                    </div>
+
+                    <div id="webcamActive" style="display: none;">
+                        <div class="video-panels">
+                            <div class="video-panel">
+                                <h4>Live Feed</h4>
+                                <video id="webcamVideo" autoplay playsinline></video>
+                                <canvas id="webcamCanvas" style="display: none;"></canvas>
+                            </div>
+                            <div class="video-panel">
+                                <h4>AI Analysis</h4>
+                                <img id="analyzedFrame" src="" alt="Analyzed frame">
+                                <div id="noAnalysis" class="no-analysis">
+                                    <p>Waiting for pose detection...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="webcam-controls">
+                            <button id="stopWebcamBtn" class="stop-btn">Stop Webcam</button>
+                            <div class="fps-indicator">
+                                FPS: <span id="fpsCounter">0</span>
+                            </div>
+                        </div>
+
+                        <div id="liveFeedback" class="live-feedback">
+                            <div class="feedback-header">
+                                <div class="skill-badge" id="liveSkill">-</div>
+                                <div class="score-badge" id="liveScore">-</div>
+                            </div>
+
+                            <div class="feedback-sections">
+                                <div class="feedback-section strengths">
+                                    <h4>✓ Strengths</h4>
+                                    <div id="liveStrengths" class="feedback-content">
+                                        <p class="placeholder">Perform a gymnastics move to see analysis...</p>
+                                    </div>
+                                </div>
+
+                                <div class="feedback-section corrections">
+                                    <h4>🎯 Corrections Needed</h4>
+                                    <div id="liveCorrections" class="feedback-content">
+                                        <p class="placeholder">No corrections yet...</p>
+                                    </div>
+                                </div>
+
+                                <div class="feedback-section tips">
+                                    <h4>💡 Coaching Tips</h4>
+                                    <div id="liveTips" class="feedback-content">
+                                        <p class="placeholder">Tips will appear here...</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="liveWarnings" class="warnings-section" style="display: none;">
+                                <h4>⚠️ Safety Warnings</h4>
+                                <div id="warningsList" class="warnings-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Powered by MediaPipe Pose Estimation & Gemini Vision API</p>
+            <p class="version">v1.0.0 | Olympic Training System</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
