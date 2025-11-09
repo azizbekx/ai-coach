@@ -274,7 +274,7 @@ class VideoProcessor:
         cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
 
         # Draw skill name
-        skill = analysis.get('skill_name', analysis.get('skill', 'Unknown'))
+        skill = analysis.get('skill_name') or analysis.get('skill') or 'Unknown'
         self._draw_text(
             frame,
             f"Skill: {skill.upper()}",

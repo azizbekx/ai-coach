@@ -7,10 +7,14 @@ Process gymnastics videos and provide real-time technique analysis and feedback.
 
 import argparse
 import sys
+import os
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+# Suppress macOS-specific NS warnings for camera/MediaPipe
+os.environ['OPENCV_AVFOUNDATION_SKIP_AUTH'] = '1'
 
 from video_processor import VideoProcessor
 from feedback_generator import FeedbackGenerator
@@ -91,6 +95,10 @@ def process_webcam():
     print("=" * 60 + "\n")
 
     cap = cv2.VideoCapture(0)
+
+    # Set camera properties to avoid macOS NS warnings
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
     if not cap.isOpened():
         print("Error: Could not open webcam")
