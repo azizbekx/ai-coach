@@ -6,7 +6,7 @@ scipy==1.11.4
 
 # Visualization and UI
 matplotlib==3.8.2
-Pillow==10.2.0
+Pillow==10.3.0
 
 # Data processing
 pandas==2.1.4
