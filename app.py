@@ -228,16 +228,16 @@ async def upload_video(video: UploadFile = File(...)):
                 'fps': results['fps'],
                 'average_score': results['average_score'],
                 'best_frame': {
-                    'frame_number': results['best_frame'],
-                    'score': results['best_score'],
-                    'timestamp': f"{results['best_frame'] / results['fps']:.2f}s"
+                    'frame_number': results.get('best_frame_number', 0),
+                    'score': results.get('best_score', 0.0),
+                    'timestamp': results.get('best_timestamp', '0.00s')
                 },
                 'worst_frame': {
-                    'frame_number': results['worst_frame'],
-                    'score': results['worst_score'],
-                    'timestamp': f"{results['worst_frame'] / results['fps']:.2f}s"
+                    'frame_number': results.get('worst_frame_number', 0),
+                    'score': results.get('worst_score', 0.0),
+                    'timestamp': results.get('worst_timestamp', '0.00s')
                 },
-                'detected_skill': results.get('detected_skill', 'general'),
+                'detected_skill': results.get('skill_detected', 'general'),
                 'common_errors': results.get('common_errors', [])
             }
         }
