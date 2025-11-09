@@ -21,6 +21,7 @@ class GymnasticsCoachApp {
     init() {
         this.setupModeSelector();
         this.setupUploadMode();
+        this.setupTrainingMode();
         this.setupWebcamMode();
     }
 
@@ -52,8 +53,13 @@ class GymnasticsCoachApp {
         }
 
         // Stop webcam if switching away
-        if (mode !== 'webcam' && this.webcamStream) {
+        if (mode !== 'webcam' && mode !== 'training' && this.webcamStream) {
             this.stopWebcam();
+        }
+
+        // Stop training if switching away
+        if (mode !== 'training' && this.trainingStream) {
+            this.stopTraining();
         }
 
         this.currentMode = mode;
@@ -200,6 +206,311 @@ class GymnasticsCoachApp {
         document.getElementById('uploadResults').style.display = 'none';
         document.getElementById('videoInput').value = '';
         document.getElementById('progressFill').style.width = '0%';
+    }
+
+    // AI Training Mode
+    setupTrainingMode() {
+        this.currentSkill = null;
+        this.trainingStream = null;
+        this.currentInstruction = null;
+
+        // Skill selection
+        const skillCards = document.querySelectorAll('.skill-card');
+        skillCards.forEach(card => {
+            card.addEventListener('click', () => {
+                const skill = card.dataset.skill;
+                this.startSkillTraining(skill);
+            });
+        });
+
+        // Instruction phase buttons
+        document.getElementById('readInstructionBtn').addEventListener('click', () => {
+            this.readInstructionAloud();
+        });
+
+        document.getElementById('readyToTryBtn').addEventListener('click', () => {
+            this.startPreparationPhase();
+        });
+
+        // Assessment phase buttons
+        document.getElementById('tryAgainBtn').addEventListener('click', () => {
+            this.resetToInstruction();
+        });
+
+        document.getElementById('newSkillBtn').addEventListener('click', () => {
+            this.backToSkillSelection();
+        });
+
+        document.getElementById('backToSkillsBtn').addEventListener('click', () => {
+            this.backToSkillSelection();
+        });
+    }
+
+    async startSkillTraining(skill) {
+        this.currentSkill = skill;
+
+        // Show training flow, hide skill selection
+        document.getElementById('skillSelection').style.display = 'none';
+        document.getElementById('trainingFlow').style.display = 'block';
+
+        // Update skill name
+        const skillName = skill.replace('_', ' ').charAt(0).toUpperCase() + skill.replace('_', ' ').slice(1);
+        document.getElementById('trainingSkillName').textContent = `${skillName} Training`;
+
+        // Load instruction
+        await this.loadInstruction(skill);
+    }
+
+    async loadInstruction(skill) {
+        try {
+            const response = await fetch('/api/training/instruction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ skill })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load instruction');
+            }
+
+            const data = await response.json();
+            this.currentInstruction = data.instruction;
+
+            // Display instruction
+            document.getElementById('instructionText').innerHTML =
+                data.instruction.replace(/\n/g, '<br>');
+
+            // Automatically read instruction aloud
+            setTimeout(() => {
+                this.readInstructionAloud();
+            }, 500);
+
+        } catch (error) {
+            console.error('Error loading instruction:', error);
+            document.getElementById('instructionText').textContent =
+                'Error loading instruction. Please try again.';
+        }
+    }
+
+    readInstructionAloud() {
+        if (!this.currentInstruction) return;
+
+        // Stop any ongoing speech
+        if (this.speechSynthesis) {
+            this.speechSynthesis.cancel();
+        }
+
+        const utterance = new SpeechSynthesisUtterance(this.currentInstruction);
+        utterance.rate = 0.9;  // Slightly slower for clarity
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        // Try to use a natural voice
+        const voices = this.speechSynthesis.getVoices();
+        const preferredVoice = voices.find(voice =>
+            voice.lang.startsWith('en') &&
+            (voice.name.includes('Google') || voice.name.includes('Natural') || voice.name.includes('Female'))
+        );
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
+
+        this.speechSynthesis.speak(utterance);
+    }
+
+    async startPreparationPhase() {
+        // Hide instruction, show preparation
+        document.getElementById('instructionPhase').style.display = 'none';
+        document.getElementById('preparationPhase').style.display = 'block';
+
+        // Start webcam
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user'
+                }
+            });
+
+            this.trainingStream = stream;
+            const video = document.getElementById('trainingVideo');
+            video.srcObject = stream;
+
+            // Start countdown
+            this.startCountdown();
+
+        } catch (error) {
+            console.error('Webcam error:', error);
+            alert('Failed to access webcam: ' + error.message);
+            this.backToSkillSelection();
+        }
+    }
+
+    startCountdown() {
+        let count = 5;
+        const countdownEl = document.getElementById('countdownNumber');
+
+        const interval = setInterval(() => {
+            count--;
+            countdownEl.textContent = count;
+
+            if (count === 0) {
+                clearInterval(interval);
+                this.captureAndAssess();
+            }
+        }, 1000);
+    }
+
+    async captureAndAssess() {
+        // Hide preparation, show assessment
+        document.getElementById('preparationPhase').style.display = 'none';
+        document.getElementById('assessmentPhase').style.display = 'block';
+        document.getElementById('assessmentResult').style.display = 'none';
+        document.getElementById('assessmentStatus').style.display = 'block';
+
+        // Capture frame
+        const video = document.getElementById('trainingVideo');
+        const canvas = document.getElementById('trainingCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+
+        const frameData = canvas.toDataURL('image/jpeg', 0.9);
+
+        // Send for assessment
+        try {
+            const response = await fetch('/api/training/assess', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    skill: this.currentSkill,
+                    frame: frameData
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Assessment failed');
+            }
+
+            const result = await response.json();
+            this.displayAssessment(result);
+
+        } catch (error) {
+            console.error('Assessment error:', error);
+            document.getElementById('assessmentStatus').innerHTML = `
+                <div class="status-icon">⚠️</div>
+                <h3>Assessment Error</h3>
+                <p>${error.message}</p>
+                <p>Make sure GEMINI_API_KEY is set in your .env file</p>
+            `;
+        }
+    }
+
+    displayAssessment(result) {
+        // Hide status, show result
+        document.getElementById('assessmentStatus').style.display = 'none';
+        document.getElementById('assessmentResult').style.display = 'block';
+
+        // Update result icon and title
+        const resultIcon = document.getElementById('resultIcon');
+        const resultTitle = document.getElementById('resultTitle');
+
+        if (result.is_correct) {
+            resultIcon.textContent = '✅';
+            resultIcon.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            resultTitle.textContent = 'Excellent Form!';
+        } else {
+            resultIcon.textContent = '📝';
+            resultIcon.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+            resultTitle.textContent = 'Good Effort! Let\'s Improve';
+        }
+
+        // Display full assessment
+        document.getElementById('fullAssessment').innerHTML =
+            result.assessment.replace(/\n/g, '<br>');
+
+        // Display corrections
+        const correctionsList = document.getElementById('correctionsList');
+        correctionsList.innerHTML = '';
+        result.corrections.forEach(correction => {
+            const li = document.createElement('li');
+            li.textContent = correction;
+            correctionsList.appendChild(li);
+        });
+
+        // Display encouragement
+        document.getElementById('encouragementText').textContent = result.encouragement;
+
+        // Read encouragement aloud
+        setTimeout(() => {
+            const utterance = new SpeechSynthesisUtterance(result.encouragement);
+            utterance.rate = 1.0;
+            this.speechSynthesis.speak(utterance);
+        }, 500);
+    }
+
+    resetToInstruction() {
+        // Stop training stream
+        if (this.trainingStream) {
+            this.trainingStream.getTracks().forEach(track => track.stop());
+            this.trainingStream = null;
+        }
+
+        // Reset to instruction phase
+        document.getElementById('preparationPhase').style.display = 'none';
+        document.getElementById('assessmentPhase').style.display = 'none';
+        document.getElementById('instructionPhase').style.display = 'block';
+
+        // Reset countdown
+        document.getElementById('countdownNumber').textContent = '5';
+
+        // Read instruction again
+        setTimeout(() => {
+            this.readInstructionAloud();
+        }, 300);
+    }
+
+    backToSkillSelection() {
+        // Stop training stream
+        if (this.trainingStream) {
+            this.trainingStream.getTracks().forEach(track => track.stop());
+            this.trainingStream = null;
+        }
+
+        // Stop any speech
+        if (this.speechSynthesis) {
+            this.speechSynthesis.cancel();
+        }
+
+        // Reset phases
+        document.getElementById('instructionPhase').style.display = 'block';
+        document.getElementById('preparationPhase').style.display = 'none';
+        document.getElementById('assessmentPhase').style.display = 'none';
+
+        // Show skill selection
+        document.getElementById('trainingFlow').style.display = 'none';
+        document.getElementById('skillSelection').style.display = 'block';
+
+        // Reset countdown
+        document.getElementById('countdownNumber').textContent = '5';
+    }
+
+    stopTraining() {
+        if (this.trainingStream) {
+            this.trainingStream.getTracks().forEach(track => track.stop());
+            this.trainingStream = null;
+        }
+
+        if (this.speechSynthesis) {
+            this.speechSynthesis.cancel();
+        }
+
+        // Reset to skill selection
+        this.backToSkillSelection();
     }
 
     // Webcam Mode

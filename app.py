@@ -102,6 +102,30 @@ class WebcamAnalysisResponse(BaseModel):
     message: Optional[str] = None
 
 
+class TrainingInstructionRequest(BaseModel):
+    skill: str
+
+
+class TrainingInstructionResponse(BaseModel):
+    success: bool
+    skill: str
+    instruction: str
+    preparation_time: int  # seconds
+
+
+class TrainingAssessmentRequest(BaseModel):
+    skill: str
+    frame: str
+
+
+class TrainingAssessmentResponse(BaseModel):
+    success: bool
+    assessment: str
+    is_correct: bool
+    corrections: list[str]
+    encouragement: str
+
+
 def allowed_file(filename: str) -> bool:
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -382,6 +406,182 @@ async def get_skills():
         })
 
     return {'skills': skills}
+
+
+@app.post("/api/training/instruction")
+async def get_training_instruction(request: TrainingInstructionRequest):
+    """Get instruction for learning a gymnastics skill"""
+    try:
+        skill = request.skill
+        skill_display = skill.replace('_', ' ').title()
+
+        # If Gemini is available, use it for better instructions
+        if gemini_client:
+            try:
+                prompt = f"""You are an expert gymnastics coach teaching a beginner how to perform a {skill_display}.
+
+Provide clear, step-by-step instructions for how to perform this skill. Your instruction should:
+1. Be encouraging and supportive
+2. Explain the key body positions (where hands, feet, hips should be)
+3. Include 3-5 specific, actionable steps
+4. Mention important safety considerations
+5. Be spoken in a friendly, coaching voice (this will be read aloud)
+
+Keep it concise (2-3 short paragraphs max). Start with "Let's learn the {skill_display}!" """
+
+                response = gemini_client.models.generate_content(
+                    model='gemini-2.0-flash-exp',
+                    contents=[prompt]
+                )
+
+                instruction = response.text
+            except Exception as e:
+                print(f"Gemini error for instruction: {e}")
+                instruction = get_fallback_instruction(skill)
+        else:
+            instruction = get_fallback_instruction(skill)
+
+        return TrainingInstructionResponse(
+            success=True,
+            skill=skill,
+            instruction=instruction,
+            preparation_time=5  # 5 seconds to get ready
+        )
+
+    except Exception as e:
+        print(f"Error getting instruction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/training/assess")
+async def assess_training_attempt(request: TrainingAssessmentRequest):
+    """Assess user's attempt at performing a skill using Gemini Vision"""
+    try:
+        if not gemini_client:
+            raise HTTPException(
+                status_code=503,
+                detail="Gemini Vision API not available. Please set GEMINI_API_KEY in .env file"
+            )
+
+        skill = request.skill
+        skill_display = skill.replace('_', ' ').title()
+
+        # Decode base64 image
+        frame_data = request.frame.split(',')[1] if ',' in request.frame else request.frame
+        frame_bytes = base64.b64decode(frame_data)
+
+        # Convert to numpy array
+        nparr = np.frombuffer(frame_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if frame is None:
+            raise HTTPException(status_code=400, detail="Failed to decode frame")
+
+        # Convert BGR to RGB
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Encode frame to JPEG
+        _, buffer = cv2.imencode('.jpg', frame_rgb)
+        image_bytes = buffer.tobytes()
+
+        # Create assessment prompt
+        prompt = f"""You are an expert gymnastics coach assessing a student's attempt at performing a {skill_display}.
+
+Analyze the image and provide:
+1. Whether they are performing the skill correctly (YES/NO)
+2. 2-3 specific corrections if needed (what to fix)
+3. 1-2 things they're doing well
+4. Encouraging feedback to keep them motivated
+
+Format your response as:
+CORRECT: [YES/NO]
+CORRECTIONS:
+- [correction 1 if needed]
+- [correction 2 if needed]
+STRENGTHS:
+- [strength 1]
+- [strength 2]
+ENCOURAGEMENT: [motivating message]
+
+Be supportive, specific, and actionable. This is a learning environment, not a competition."""
+
+        # Call Gemini Vision API
+        response = gemini_client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents=[
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type='image/jpeg',
+                ),
+                prompt
+            ]
+        )
+
+        # Parse response
+        assessment_text = response.text
+        is_correct = 'CORRECT: YES' in assessment_text.upper()
+
+        # Extract corrections
+        corrections = []
+        if 'CORRECTIONS:' in assessment_text:
+            corrections_section = assessment_text.split('CORRECTIONS:')[1].split('STRENGTHS:')[0]
+            corrections = [line.strip('- ').strip() for line in corrections_section.split('\n') if line.strip().startswith('-')]
+
+        # Extract encouragement
+        encouragement = "Keep practicing! You're doing great!"
+        if 'ENCOURAGEMENT:' in assessment_text:
+            encouragement = assessment_text.split('ENCOURAGEMENT:')[1].strip().split('\n')[0]
+
+        return TrainingAssessmentResponse(
+            success=True,
+            assessment=assessment_text,
+            is_correct=is_correct,
+            corrections=corrections if corrections else ["Great job! Keep practicing to maintain consistency."],
+            encouragement=encouragement
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in training assessment: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def get_fallback_instruction(skill: str) -> str:
+    """Get fallback instruction when Gemini is not available"""
+    instructions = {
+        'handstand': """Let's learn the Handstand!
+
+Start by placing your hands shoulder-width apart on the floor. Keep your arms straight and strong. Kick one leg up towards the ceiling while keeping your core tight. Bring your other leg up to meet it. Focus on pushing through your shoulders and keeping your body in a straight line from your hands to your toes.
+
+Important: Start against a wall for safety. Keep your head neutral and look at the floor between your hands. Engage your core throughout the entire movement.""",
+
+        'bridge': """Let's learn the Bridge!
+
+Lie on your back with your knees bent and feet flat on the floor, hip-width apart. Place your hands by your ears with fingers pointing toward your shoulders. Press through your hands and feet to lift your hips high toward the ceiling. Straighten your arms as much as possible.
+
+Key points: Keep your feet parallel, push your chest toward the wall behind you, and engage your glutes. Breathe steadily and don't forget to warm up your shoulders first!""",
+
+        'split': """Let's learn the Split!
+
+Start in a lunge position with your front knee bent and back knee on the ground. Slowly slide your front foot forward and back foot backward, lowering your hips toward the ground. Keep your hips square and facing forward throughout the movement.
+
+Safety first: Go slowly! Never bounce. Only go as far as you can while maintaining control. Keep your chest lifted and hands on the ground for support.""",
+
+        'pike': """Let's learn the Pike!
+
+Start standing with feet together. Keep your legs completely straight as you fold forward from your hips. Reach your hands toward the ground, keeping your back straight. Your body should form an inverted 'V' shape.
+
+Focus on: Keeping knees locked, engaging your core, and reaching your chest toward your thighs. If you can't touch the ground, that's okay! Flexibility takes time."""
+    }
+
+    return instructions.get(skill, f"""Let's learn the {skill.replace('_', ' ').title()}!
+
+This is a fundamental gymnastics skill that requires focus and practice. Start by understanding the basic body positions. Keep your core engaged, maintain proper alignment, and move with control.
+
+Remember: Safety first! Warm up properly, use mats when appropriate, and never push beyond your limits. Progress gradually and celebrate small improvements.""")
 
 
 # Mount static files AFTER all routes are defined
