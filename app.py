@@ -398,38 +398,62 @@ async def generate_upload_summary(request: Request):
         worst_score = results.get('worst_frame', {}).get('score', 0)
         common_errors = results.get('common_errors', [])
 
+        # Safely handle common_errors - ensure it's a list
         errors_text = ""
-        if common_errors:
-            errors_text = "\n".join([f"- {error['error'].replace('_', ' ')}: occurred {error['count']} times"
-                                     for error in common_errors[:5]])
+        if common_errors and isinstance(common_errors, list) and len(common_errors) > 0:
+            error_items = []
+            for error in common_errors[:5]:
+                if isinstance(error, dict):
+                    error_name = error.get('error', 'unknown').replace('_', ' ')
+                    error_count = error.get('count', 0)
+                    error_items.append(f"- {error_name}: occurred {error_count} times")
+            errors_text = "\n".join(error_items) if error_items else "No significant errors detected"
         else:
             errors_text = "No significant errors detected"
+
+        # Determine performance level
+        performance_level = "excellent" if avg_score >= 9.0 else "very good" if avg_score >= 8.0 else "good" if avg_score >= 7.0 else "developing"
 
         prompt = f"""You are an expert gymnastics coach providing a comprehensive video analysis summary.
 
 **Video Analysis Results:**
 - Detected Skill: {skill}
-- Average Score: {avg_score:.2f}/10.0
+- Average Score: {avg_score:.2f}/10.0 ({performance_level} performance)
 - Best Performance: {best_score:.2f}/10.0
 - Lowest Performance: {worst_score:.2f}/10.0
 
 **Common Issues Found:**
 {errors_text}
 
-Based on this ML analysis data, please provide:
+Based on this ML analysis data, please provide a detailed coaching summary:
 
-1. **Overall Assessment** (2-3 sentences): Evaluate the athlete's performance level
-2. **Key Strengths** (2-3 points): What they're doing well based on the scores
-3. **Priority Improvements** (3-4 points): Most important areas to work on based on the errors
-4. **Training Recommendations** (2-3 suggestions): Specific exercises or drills to improve
+1. **Overall Assessment** (2-3 sentences):
+   - Evaluate the athlete's performance level based on the {avg_score:.2f}/10 average score
+   - Comment on consistency (best: {best_score:.2f}, worst: {worst_score:.2f})
+   - Acknowledge their current skill level
+
+2. **Key Strengths** (2-3 points):
+   - What they're doing well to achieve a {avg_score:.2f}/10 score
+   - Technical aspects that are solid
+   - Areas of excellence
+
+3. **Areas for Refinement** (2-3 points):
+   - Even excellent performers can improve - suggest advanced techniques
+   - Focus on perfecting form and consistency
+   - Address any score variations (best vs worst performance)
+
+4. **Training Recommendations** (2-3 suggestions):
+   - Specific drills or exercises to reach the next level
+   - Mental preparation and competition readiness
+   - How to maintain and enhance current performance
 
 Keep your feedback:
 - Professional yet encouraging
 - Specific and actionable
-- Focused on technique improvement
-- Suitable for an athlete training for competitions
+- Appropriate for the skill level shown ({performance_level})
+- Focused on continuous improvement
 
-Format your response clearly with headers and bullet points."""
+Format with clear markdown headers (##) and bullet points (-)."""
 
         # Call Gemini API
         response = gemini_client.models.generate_content(
