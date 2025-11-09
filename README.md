@@ -252,16 +252,219 @@ QUALITY: Good
 
 ---
 
+## 🌐 Web User Interface
+
+The AI Gymnastics Coach now includes a modern web interface for easier interaction! Access both video upload and live webcam analysis through your browser.
+
+### Starting the Web Server
+
+```bash
+# Install web dependencies (if not already installed)
+pip install -r requirements.txt
+
+# Optional: Set up Gemini Vision API for enhanced live feedback
+export GEMINI_API_KEY=your_gemini_api_key_here
+
+# Start the FastAPI server
+python app.py
+```
+
+The web application will start on `http://localhost:8000`
+
+Access the interactive API docs at `http://localhost:8000/docs`
+
+#### Gemini Vision API (Optional Enhancement)
+
+For enhanced real-time feedback powered by Google's Gemini Vision AI:
+
+1. Get a free API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Set the environment variable:
+   ```bash
+   export GEMINI_API_KEY=your_api_key_here
+   ```
+3. Restart the server
+
+When enabled, the webcam mode provides:
+- Advanced pose analysis using multimodal AI
+- More detailed coaching feedback
+- Additional safety recommendations
+- Natural language technique explanations
+
+The system works perfectly without Gemini (using MediaPipe alone), but Gemini adds enhanced insights.
+
+### Web UI Features
+
+#### 1. Upload Video Mode 📁
+
+- **Drag & Drop**: Simply drag your gymnastics video into the upload area
+- **File Browser**: Click to browse and select video files
+- **Supported Formats**: MP4, AVI, MOV, MKV, WebM (max 500MB)
+- **Real-time Progress**: Watch your video being analyzed with a progress bar
+- **Detailed Results Dashboard**:
+  - Average, best, and worst scores
+  - Detected gymnastics skill
+  - Frame-by-frame statistics
+  - Most common errors with occurrence counts
+  - Download annotated video with visual feedback
+
+#### 2. Live Webcam Mode 📹
+
+- **Real-time Analysis**: Get instant feedback on your form
+- **Dual View**: See your live feed alongside AI-annotated analysis
+- **🔊 Voice Feedback (NEW!)**: Toggle real-time spoken coaching
+  - Hands-free coaching powered by Web Speech API
+  - Uses Gemini AI feedback when available (natural language)
+  - Automatic cooldown to avoid overwhelming feedback
+  - Preference saved across sessions
+- **FPS Counter**: Monitor analysis performance
+- **Live Feedback Display**:
+  - Current skill being performed
+  - Real-time score (color-coded by performance)
+  - Strengths: What you're doing well
+  - Corrections: What needs improvement (prioritized)
+  - Coaching Tips: Specific advice for better form
+  - Safety Warnings: Injury risk alerts
+  - AI Enhanced section (when Gemini is enabled)
+- **Simple Controls**: Start/stop with one click
+
+### Web UI Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  Frontend (Browser)                      │
+│                                                          │
+│  • HTML5 + CSS3 (Modern responsive design)              │
+│  • Vanilla JavaScript (No framework dependencies)       │
+│  • WebRTC for webcam access                             │
+│  • Canvas API for frame capture                         │
+└────────────────────┬────────────────────────────────────┘
+                     │ REST API
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│              FastAPI Backend (app.py)                    │
+│                                                          │
+│  • POST /api/upload - Video upload & processing         │
+│  • POST /api/webcam/analyze - Frame-by-frame analysis   │
+│  • GET /api/download/<file> - Processed video download  │
+│  • GET /api/health - Server health check                │
+│  • GET /api/skills - Available gymnastics skills        │
+│  • GET /docs - Interactive API documentation            │
+└────────────────────┬────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│           Core Analysis Pipeline                         │
+│     (Same as CLI: pose_estimator, analyzer, etc.)       │
+└─────────────────────────────────────────────────────────┘
+```
+
+### API Endpoints
+
+#### Upload Video
+```http
+POST /api/upload
+Content-Type: multipart/form-data
+
+Form Data:
+  video: <video file>
+
+Response:
+{
+  "success": true,
+  "output_video": "/api/download/analyzed_video.mp4",
+  "results": {
+    "average_score": 8.7,
+    "best_frame": { "frame_number": 150, "score": 9.2, "timestamp": "5.00s" },
+    "worst_frame": { "frame_number": 200, "score": 7.8, "timestamp": "6.67s" },
+    "detected_skill": "handstand",
+    "common_errors": [
+      { "error": "right_toes", "count": 120 },
+      { "error": "left_toes", "count": 115 }
+    ]
+  }
+}
+```
+
+#### Analyze Webcam Frame
+```http
+POST /api/webcam/analyze
+Content-Type: application/json
+
+Body:
+{
+  "frame": "data:image/jpeg;base64,<base64-encoded-frame>"
+}
+
+Response:
+{
+  "success": true,
+  "pose_detected": true,
+  "annotated_frame": "data:image/jpeg;base64,<annotated-frame>",
+  "analysis": {
+    "skill": "handstand",
+    "score": 8.7,
+    "quality": "Good",
+    "feedback": {
+      "strengths": ["Excellent toe point", "Perfect arm extension"],
+      "corrections": ["Right shoulder should be extended more"],
+      "tips": ["Focus weight over fingertips"],
+      "warnings": []
+    }
+  }
+}
+```
+
+### File Structure (Web UI)
+
+```
+ai-coach/
+├── app.py                     # Flask web application
+├── templates/
+│   └── index.html            # Main web interface
+├── static/
+│   ├── css/
+│   │   └── style.css         # Modern dark theme styling
+│   └── js/
+│       └── app.js            # Frontend application logic
+├── uploads/                   # Temporary upload storage (auto-created)
+└── outputs/                   # Processed video storage (auto-created)
+```
+
+### Development Features
+
+- **FastAPI Benefits**:
+  - High performance (async/await support)
+  - Automatic interactive API docs (`/docs` and `/redoc`)
+  - Type hints and Pydantic models for data validation
+  - OpenAPI/Swagger specification
+- **CORS Enabled**: For development with separate frontend
+- **Auto-reload**: Hot reload with uvicorn for rapid development
+- **Error Handling**: Comprehensive error messages with proper HTTP status codes
+- **File Cleanup**: Automatic cleanup of uploaded files
+- **Progress Tracking**: Real-time processing updates
+
+---
+
 ## 📁 Project Structure
 
 ```
 ai-coach/
-├── coach.py                    # Main application entry point
+├── coach.py                    # CLI application entry point
+├── app.py                      # FastAPI web application
 ├── pose_estimator.py          # MediaPipe pose detection wrapper
 ├── gymnastics_analyzer.py     # Form analysis and scoring engine
 ├── feedback_generator.py      # Coaching feedback generator
 ├── video_processor.py         # Video processing pipeline
 ├── config.py                  # Configuration and thresholds
+├── templates/
+│   └── index.html            # Web UI main page
+├── static/
+│   ├── css/
+│   │   └── style.css         # Modern dark theme styling
+│   └── js/
+│       └── app.js            # Frontend application logic
+├── uploads/                   # Temporary upload storage (auto-created)
+├── outputs/                   # Processed videos (auto-created)
 ├── requirements.txt           # Python dependencies
 ├── README.md                  # This file
 └── .gitignore                # Git ignore rules

@@ -274,7 +274,10 @@ class VideoProcessor:
         cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
 
         # Draw skill name
-        skill = analysis.get('skill_name') or analysis.get('skill') or 'Unknown'
+        skill = analysis.get('skill_name', analysis.get('skill', 'general'))
+        # Handle None case
+        if skill is None:
+            skill = 'general'
         self._draw_text(
             frame,
             f"Skill: {skill.upper()}",
@@ -285,8 +288,11 @@ class VideoProcessor:
         )
 
         # Draw score
-        score = analysis['score']
-        quality = analysis['overall_quality']
+        score = analysis.get('score', 0.0)
+        quality = analysis.get('overall_quality', 'Unknown')
+        # Handle None case
+        if quality is None:
+            quality = 'Unknown'
         self._draw_text(
             frame,
             f"Score: {score:.1f}/10.0 - {quality}",
