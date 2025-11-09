@@ -21,11 +21,18 @@ from pydantic import BaseModel
 
 import cv2
 import numpy as np
+from typing import Optional
 
 from video_processor import VideoProcessor
-from pose_estimator import PoseEstimator
-from gymnastics_analyzer import GymnasticsAnalyzer
-from feedback_generator import FeedbackGenerator
+
+# Gemini Vision API (optional)
+try:
+    from google import genai
+    from google.genai import types
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    print("Warning: google-genai not installed. Gemini Vision API will not be available.")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -56,11 +63,25 @@ MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Initialize components
-pose_estimator = PoseEstimator()
-analyzer = GymnasticsAnalyzer()
-feedback_generator = FeedbackGenerator()
-video_processor = VideoProcessor(pose_estimator, analyzer, feedback_generator)
+# Initialize video processor (it creates its own pose estimator, analyzer, and feedback generator)
+video_processor = VideoProcessor()
+
+# Initialize Gemini client (optional)
+gemini_client = None
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
+if GEMINI_AVAILABLE and GEMINI_API_KEY:
+    try:
+        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+        print("✅ Gemini Vision API initialized successfully")
+    except Exception as e:
+        print(f"⚠️  Failed to initialize Gemini: {e}")
+        gemini_client = None
+else:
+    if not GEMINI_AVAILABLE:
+        print("ℹ️  Gemini Vision API not available (install: pip install google-genai)")
+    elif not GEMINI_API_KEY:
+        print("ℹ️  Gemini API key not set (export GEMINI_API_KEY=your_key)")
 
 
 # Pydantic models
@@ -85,6 +106,65 @@ class WebcamAnalysisResponse(BaseModel):
 def allowed_file(filename: str) -> bool:
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def get_gemini_feedback(frame: np.ndarray, skill: str, score: float) -> Optional[dict]:
+    """
+    Get enhanced feedback from Gemini Vision API
+
+    Args:
+        frame: Image frame (BGR numpy array)
+        skill: Detected gymnastics skill
+        score: Current score from pose analysis
+
+    Returns:
+        Enhanced feedback dictionary or None
+    """
+    if not gemini_client:
+        return None
+
+    try:
+        # Convert BGR to RGB
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Encode frame to JPEG
+        _, buffer = cv2.imencode('.jpg', frame_rgb)
+        image_bytes = buffer.tobytes()
+
+        # Create Gemini prompt
+        prompt = f"""You are an expert gymnastics coach analyzing a gymnast's form in real-time.
+
+Current Analysis:
+- Detected Skill: {skill}
+- Current Score: {score:.1f}/10.0
+
+Please provide:
+1. 2-3 specific technical corrections to improve form (be concise and actionable)
+2. 1-2 strengths in the current position
+3. Any safety concerns or injury risks you observe
+
+Keep feedback brief and focused on immediate actionable improvements."""
+
+        # Call Gemini Vision API
+        response = gemini_client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents=[
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type='image/jpeg',
+                ),
+                prompt
+            ]
+        )
+
+        return {
+            'gemini_feedback': response.text,
+            'source': 'gemini-vision'
+        }
+
+    except Exception as e:
+        print(f"Gemini API error: {e}")
+        return None
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -215,7 +295,7 @@ async def analyze_webcam_frame(request: WebcamFrameRequest):
         # Process frame
         result = video_processor.process_frame(frame, draw_annotations=True)
 
-        if result is None:
+        if not result or not result.get('pose_detected'):
             return WebcamAnalysisResponse(
                 success=False,
                 pose_detected=False,
@@ -223,27 +303,45 @@ async def analyze_webcam_frame(request: WebcamFrameRequest):
             )
 
         # Encode annotated frame back to base64
-        _, buffer = cv2.imencode('.jpg', result['annotated_frame'])
+        _, buffer = cv2.imencode('.jpg', result['frame'])
         annotated_base64 = base64.b64encode(buffer).decode('utf-8')
 
-        # Prepare response
+        # Extract data from result
+        analysis = result.get('analysis', {})
+        feedback = result.get('feedback', {})
+        skill = analysis.get('skill', 'general')
+        score = analysis.get('score', 0.0)
+
+        # Get enhanced feedback from Gemini Vision API (if available)
+        gemini_enhanced = get_gemini_feedback(frame, skill, score)
+
+        # Prepare response data
+        analysis_data = {
+            'skill': skill,
+            'score': score,
+            'quality': analysis.get('overall_quality', 'Unknown'),
+            'feedback': {
+                'strengths': feedback.get('strengths', []),
+                'corrections': feedback.get('corrections', [])[:5],  # Top 5
+                'tips': feedback.get('tips', [])[:3],  # Top 3
+                'warnings': feedback.get('warnings', []),
+                'overall': feedback.get('overall', '')
+            },
+            'angles': result.get('angles', {})
+        }
+
+        # Add Gemini feedback if available
+        if gemini_enhanced:
+            analysis_data['gemini_feedback'] = gemini_enhanced['gemini_feedback']
+            analysis_data['feedback_source'] = 'hybrid'  # MediaPipe + Gemini
+        else:
+            analysis_data['feedback_source'] = 'mediapipe'  # MediaPipe only
+
         response_data = WebcamAnalysisResponse(
             success=True,
             pose_detected=True,
             annotated_frame=f'data:image/jpeg;base64,{annotated_base64}',
-            analysis={
-                'skill': result['skill'],
-                'score': result['score'],
-                'quality': result['quality'],
-                'feedback': {
-                    'strengths': result['feedback']['strengths'],
-                    'corrections': result['feedback']['corrections'][:5],  # Top 5
-                    'tips': result['feedback']['tips'][:3],  # Top 3
-                    'warnings': result['feedback']['warnings'],
-                    'overall': result['feedback']['overall']
-                },
-                'angles': result['angles']
-            }
+            analysis=analysis_data
         )
 
         return response_data

@@ -595,6 +595,27 @@ body {
     border-radius: 8px;
 }
 
+/* Gemini Enhanced Feedback */
+.gemini-enhanced {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+    border: 2px solid var(--primary-color);
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
+}
+
+.gemini-enhanced h4 {
+    color: var(--primary-color);
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+}
+
+#geminiContent {
+    color: var(--text-primary);
+    line-height: 1.6;
+    font-size: 0.95rem;
+}
+
 /* Footer */
 .footer {
     text-align: center;

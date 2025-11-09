@@ -319,8 +319,9 @@ class GymnasticsCoachApp {
         noAnalysis.style.display = 'none';
 
         // Update skill and score
-        document.getElementById('liveSkill').textContent =
-            analysis.skill.replace('_', ' ').toUpperCase();
+        const skillText = analysis.skill.replace('_', ' ').toUpperCase();
+        const feedbackSource = analysis.feedback_source === 'hybrid' ? ' (AI Enhanced)' : '';
+        document.getElementById('liveSkill').textContent = skillText + feedbackSource;
         document.getElementById('liveScore').textContent =
             `${analysis.score.toFixed(1)}/10`;
 
@@ -375,6 +376,27 @@ class GymnasticsCoachApp {
                 '</ul>';
         } else {
             warningsSection.style.display = 'none';
+        }
+
+        // Display Gemini AI enhanced feedback if available
+        let geminiSection = document.getElementById('geminiEnhanced');
+        if (!geminiSection) {
+            // Create Gemini section if it doesn't exist
+            geminiSection = document.createElement('div');
+            geminiSection.id = 'geminiEnhanced';
+            geminiSection.className = 'gemini-enhanced';
+            geminiSection.innerHTML = '<h4>🤖 AI Enhanced Feedback</h4><div id="geminiContent"></div>';
+            document.getElementById('liveFeedback').appendChild(geminiSection);
+        }
+
+        if (analysis.gemini_feedback) {
+            geminiSection.style.display = 'block';
+            document.getElementById('geminiContent').innerHTML =
+                '<pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">' +
+                analysis.gemini_feedback +
+                '</pre>';
+        } else {
+            geminiSection.style.display = 'none';
         }
     }
 

@@ -262,6 +262,9 @@ The AI Gymnastics Coach now includes a modern web interface for easier interacti
 # Install web dependencies (if not already installed)
 pip install -r requirements.txt
 
+# Optional: Set up Gemini Vision API for enhanced live feedback
+export GEMINI_API_KEY=your_gemini_api_key_here
+
 # Start the FastAPI server
 python app.py
 ```
@@ -269,6 +272,25 @@ python app.py
 The web application will start on `http://localhost:8000`
 
 Access the interactive API docs at `http://localhost:8000/docs`
+
+#### Gemini Vision API (Optional Enhancement)
+
+For enhanced real-time feedback powered by Google's Gemini Vision AI:
+
+1. Get a free API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Set the environment variable:
+   ```bash
+   export GEMINI_API_KEY=your_api_key_here
+   ```
+3. Restart the server
+
+When enabled, the webcam mode provides:
+- Advanced pose analysis using multimodal AI
+- More detailed coaching feedback
+- Additional safety recommendations
+- Natural language technique explanations
+
+The system works perfectly without Gemini (using MediaPipe alone), but Gemini adds enhanced insights.
 
 ### Web UI Features
 
