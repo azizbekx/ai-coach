@@ -8,6 +8,13 @@ class GymnasticsCoachApp {
         this.fpsCounter = 0;
         this.lastFrameTime = Date.now();
 
+        // Voice feedback settings
+        this.voiceEnabled = false;
+        this.speechSynthesis = window.speechSynthesis;
+        this.currentUtterance = null;
+        this.lastSpokenFeedback = '';
+        this.speakCooldown = false;
+
         this.init();
     }
 
@@ -204,6 +211,25 @@ class GymnasticsCoachApp {
         document.getElementById('stopWebcamBtn').addEventListener('click', () => {
             this.stopWebcam();
         });
+
+        // Voice feedback toggle
+        const voiceToggle = document.getElementById('voiceToggle');
+        if (voiceToggle) {
+            // Load saved preference
+            this.voiceEnabled = localStorage.getItem('voiceEnabled') === 'true';
+            voiceToggle.checked = this.voiceEnabled;
+
+            voiceToggle.addEventListener('change', (e) => {
+                this.voiceEnabled = e.target.checked;
+                localStorage.setItem('voiceEnabled', this.voiceEnabled);
+
+                if (!this.voiceEnabled && this.currentUtterance) {
+                    this.speechSynthesis.cancel();
+                }
+
+                console.log('Voice feedback:', this.voiceEnabled ? 'enabled' : 'disabled');
+            });
+        }
     }
 
     async startWebcam() {
@@ -244,6 +270,13 @@ class GymnasticsCoachApp {
             clearInterval(this.analysisInterval);
             this.analysisInterval = null;
         }
+
+        // Stop any ongoing speech
+        if (this.speechSynthesis) {
+            this.speechSynthesis.cancel();
+        }
+        this.speakCooldown = false;
+        this.lastSpokenFeedback = '';
 
         document.getElementById('webcamPlaceholder').style.display = 'block';
         document.getElementById('webcamActive').style.display = 'none';
@@ -398,6 +431,17 @@ class GymnasticsCoachApp {
         } else {
             geminiSection.style.display = 'none';
         }
+
+        // Speak feedback if voice is enabled (with smart timing)
+        const spokenFeedback = this.generateSpokenFeedback(analysis);
+        if (spokenFeedback && this.voiceEnabled) {
+            // Only speak every 5 seconds to avoid overwhelming the user
+            if (!this.speakCooldown) {
+                setTimeout(() => {
+                    this.speakFeedback(spokenFeedback);
+                }, 500); // Small delay to let rendering complete
+            }
+        }
     }
 
     showNoPoseDetected() {
@@ -432,6 +476,79 @@ class GymnasticsCoachApp {
 
         const fps = Math.round(1000 / delta);
         document.getElementById('fpsCounter').textContent = fps;
+    }
+
+    speakFeedback(text) {
+        // Check if voice is enabled and speech synthesis is available
+        if (!this.voiceEnabled || !this.speechSynthesis || this.speakCooldown) {
+            return;
+        }
+
+        // Avoid repeating the same feedback
+        if (text === this.lastSpokenFeedback) {
+            return;
+        }
+
+        // Cancel any ongoing speech
+        this.speechSynthesis.cancel();
+
+        // Create new utterance
+        this.currentUtterance = new SpeechSynthesisUtterance(text);
+
+        // Configure voice settings
+        this.currentUtterance.rate = 1.0;  // Normal speed
+        this.currentUtterance.pitch = 1.0; // Normal pitch
+        this.currentUtterance.volume = 0.9; // Slightly lower volume
+
+        // Try to use a more natural voice (English)
+        const voices = this.speechSynthesis.getVoices();
+        const preferredVoice = voices.find(voice =>
+            voice.lang.startsWith('en') &&
+            (voice.name.includes('Google') || voice.name.includes('Natural'))
+        );
+        if (preferredVoice) {
+            this.currentUtterance.voice = preferredVoice;
+        }
+
+        // Event handlers
+        this.currentUtterance.onend = () => {
+            this.speakCooldown = false;
+        };
+
+        this.currentUtterance.onerror = (error) => {
+            console.error('Speech synthesis error:', error);
+            this.speakCooldown = false;
+        };
+
+        // Speak the text
+        this.speechSynthesis.speak(this.currentUtterance);
+        this.lastSpokenFeedback = text;
+        this.speakCooldown = true;
+    }
+
+    generateSpokenFeedback(analysis) {
+        // Create concise spoken feedback from Gemini or analysis
+        if (analysis.gemini_feedback) {
+            // Use Gemini feedback directly (it's already conversational)
+            return analysis.gemini_feedback;
+        }
+
+        // Fallback: Create spoken feedback from standard analysis
+        const skill = analysis.skill.replace('_', ' ');
+        const score = analysis.score.toFixed(1);
+        const quality = analysis.quality;
+
+        let spokenText = `${skill}. Score: ${score} out of 10. ${quality}. `;
+
+        // Add top correction if available
+        if (analysis.feedback.corrections.length > 0) {
+            const topCorrection = analysis.feedback.corrections[0]
+                .replace(/🔴|🟠|🟡|⚪/g, '')  // Remove emoji
+                .replace(/CRITICAL:|MAJOR:|FIX:|IMPROVE:/g, ''); // Remove severity labels
+            spokenText += topCorrection;
+        }
+
+        return spokenText;
     }
 }
 

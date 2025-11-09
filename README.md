@@ -311,6 +311,11 @@ The system works perfectly without Gemini (using MediaPipe alone), but Gemini ad
 
 - **Real-time Analysis**: Get instant feedback on your form
 - **Dual View**: See your live feed alongside AI-annotated analysis
+- **🔊 Voice Feedback (NEW!)**: Toggle real-time spoken coaching
+  - Hands-free coaching powered by Web Speech API
+  - Uses Gemini AI feedback when available (natural language)
+  - Automatic cooldown to avoid overwhelming feedback
+  - Preference saved across sessions
 - **FPS Counter**: Monitor analysis performance
 - **Live Feedback Display**:
   - Current skill being performed
@@ -319,6 +324,7 @@ The system works perfectly without Gemini (using MediaPipe alone), but Gemini ad
   - Corrections: What needs improvement (prioritized)
   - Coaching Tips: Specific advice for better form
   - Safety Warnings: Injury risk alerts
+  - AI Enhanced section (when Gemini is enabled)
 - **Simple Controls**: Start/stop with one click
 
 ### Web UI Architecture
