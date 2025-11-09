@@ -102,6 +102,30 @@ class WebcamAnalysisResponse(BaseModel):
     message: Optional[str] = None
 
 
+class TrainingInstructionRequest(BaseModel):
+    skill: str
+
+
+class TrainingInstructionResponse(BaseModel):
+    success: bool
+    skill: str
+    instruction: str
+    preparation_time: int  # seconds
+
+
+class TrainingAssessmentRequest(BaseModel):
+    skill: str
+    frame: str
+
+
+class TrainingAssessmentResponse(BaseModel):
+    success: bool
+    assessment: str
+    is_correct: bool
+    corrections: list[str]
+    encouragement: str
+
+
 def allowed_file(filename: str) -> bool:
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -354,6 +378,106 @@ async def analyze_webcam_frame(request: WebcamFrameRequest):
         raise HTTPException(status_code=500, detail=f"Error analyzing frame: {str(e)}")
 
 
+@app.post("/api/upload/summary")
+async def generate_upload_summary(request: Request):
+    """Generate Gemini AI summary for uploaded video analysis"""
+    try:
+        if not gemini_client:
+            return JSONResponse(content={
+                'success': False,
+                'message': 'Gemini API not available'
+            })
+
+        data = await request.json()
+        results = data.get('results', {})
+
+        # Create comprehensive prompt for Gemini
+        skill = results.get('detected_skill', 'general').replace('_', ' ').title()
+        avg_score = results.get('average_score', 0)
+        best_score = results.get('best_frame', {}).get('score', 0)
+        worst_score = results.get('worst_frame', {}).get('score', 0)
+        common_errors = results.get('common_errors', [])
+
+        # Safely handle common_errors - ensure it's a list
+        errors_text = ""
+        if common_errors and isinstance(common_errors, list) and len(common_errors) > 0:
+            error_items = []
+            for error in common_errors[:5]:
+                if isinstance(error, dict):
+                    error_name = error.get('error', 'unknown').replace('_', ' ')
+                    error_count = error.get('count', 0)
+                    error_items.append(f"- {error_name}: occurred {error_count} times")
+            errors_text = "\n".join(error_items) if error_items else "No significant errors detected"
+        else:
+            errors_text = "No significant errors detected"
+
+        # Determine performance level
+        performance_level = "excellent" if avg_score >= 9.0 else "very good" if avg_score >= 8.0 else "good" if avg_score >= 7.0 else "developing"
+
+        prompt = f"""You are an expert gymnastics coach providing a comprehensive video analysis summary.
+
+**Video Analysis Results:**
+- Detected Skill: {skill}
+- Average Score: {avg_score:.2f}/10.0 ({performance_level} performance)
+- Best Performance: {best_score:.2f}/10.0
+- Lowest Performance: {worst_score:.2f}/10.0
+
+**Common Issues Found:**
+{errors_text}
+
+Based on this ML analysis data, please provide a detailed coaching summary:
+
+1. **Overall Assessment** (2-3 sentences):
+   - Evaluate the athlete's performance level based on the {avg_score:.2f}/10 average score
+   - Comment on consistency (best: {best_score:.2f}, worst: {worst_score:.2f})
+   - Acknowledge their current skill level
+
+2. **Key Strengths** (2-3 points):
+   - What they're doing well to achieve a {avg_score:.2f}/10 score
+   - Technical aspects that are solid
+   - Areas of excellence
+
+3. **Areas for Refinement** (2-3 points):
+   - Even excellent performers can improve - suggest advanced techniques
+   - Focus on perfecting form and consistency
+   - Address any score variations (best vs worst performance)
+
+4. **Training Recommendations** (2-3 suggestions):
+   - Specific drills or exercises to reach the next level
+   - Mental preparation and competition readiness
+   - How to maintain and enhance current performance
+
+Keep your feedback:
+- Professional yet encouraging
+- Specific and actionable
+- Appropriate for the skill level shown ({performance_level})
+- Focused on continuous improvement
+
+Format with clear markdown headers (##) and bullet points (-)."""
+
+        # Call Gemini API
+        response = gemini_client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents=[prompt]
+        )
+
+        summary = response.text
+
+        return JSONResponse(content={
+            'success': True,
+            'summary': summary
+        })
+
+    except Exception as e:
+        print(f"Error generating Gemini summary: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={
+            'success': False,
+            'message': f'Error generating summary: {str(e)}'
+        })
+
+
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
@@ -365,6 +489,55 @@ async def health_check():
             'feedback_generator': 'ready'
         }
     }
+
+
+# Warm-up sequences
+WARMUP_SEQUENCES = {
+    'desk_worker': {
+        'name': 'Desk Worker Warm-Up',
+        'description': 'Perfect 5-minute warm-up for developers and desk workers',
+        'icon': '💻',
+        'actions': [
+            {'skill': 'sitting_posture', 'duration': 'Hold for 5 seconds'},
+            {'skill': 'arms_raised', 'duration': 'Hold for 5 seconds'},
+            {'skill': 'stretching', 'duration': 'Do 3 times'},
+            {'skill': 'standing_straight', 'duration': 'Hold for 5 seconds'},
+            {'skill': 't_pose', 'duration': 'Hold for 5 seconds'}
+        ]
+    },
+    'posture_check': {
+        'name': 'Posture Check Routine',
+        'description': 'Quick posture assessment - perfect for demos',
+        'icon': '🧍',
+        'actions': [
+            {'skill': 'standing_straight', 'duration': 'Hold steady'},
+            {'skill': 'sitting_posture', 'duration': 'Hold steady'},
+            {'skill': 't_pose', 'duration': 'Hold for 5 seconds'}
+        ]
+    },
+    'demo_quick': {
+        'name': 'Quick Demo',
+        'description': 'Fast 2-minute demo of AI coaching capabilities',
+        'icon': '⚡',
+        'actions': [
+            {'skill': 'thumbs_up', 'duration': 'Show clearly'},
+            {'skill': 'arms_raised', 'duration': 'Hold high'},
+            {'skill': 't_pose', 'duration': 'Hold steady'}
+        ]
+    },
+    'full_stretch': {
+        'name': 'Full Body Stretch',
+        'description': 'Complete stretching routine for energy boost',
+        'icon': '🤸',
+        'actions': [
+            {'skill': 'standing_straight', 'duration': 'Start position'},
+            {'skill': 'arms_raised', 'duration': 'Reach up'},
+            {'skill': 't_pose', 'duration': 'Arms out'},
+            {'skill': 'stretching', 'duration': 'Side to side'},
+            {'skill': 'sitting_posture', 'duration': 'Cool down'}
+        ]
+    }
+}
 
 
 @app.get("/api/skills")
@@ -382,6 +555,252 @@ async def get_skills():
         })
 
     return {'skills': skills}
+
+
+@app.get("/api/warmup/sequences")
+async def get_warmup_sequences():
+    """Get list of available warm-up sequences"""
+    sequences = []
+    for seq_id, seq_data in WARMUP_SEQUENCES.items():
+        sequences.append({
+            'id': seq_id,
+            'name': seq_data['name'],
+            'description': seq_data['description'],
+            'icon': seq_data['icon'],
+            'action_count': len(seq_data['actions'])
+        })
+    return {'sequences': sequences}
+
+
+@app.get("/api/warmup/{sequence_id}")
+async def get_warmup_sequence(sequence_id: str):
+    """Get details of a specific warm-up sequence"""
+    if sequence_id not in WARMUP_SEQUENCES:
+        raise HTTPException(status_code=404, detail="Sequence not found")
+
+    return {
+        'success': True,
+        'sequence': WARMUP_SEQUENCES[sequence_id]
+    }
+
+
+@app.post("/api/training/instruction")
+async def get_training_instruction(request: TrainingInstructionRequest):
+    """Get instruction for learning a gymnastics skill"""
+    try:
+        skill = request.skill
+        skill_display = skill.replace('_', ' ').title()
+
+        # If Gemini is available, use it for better instructions
+        if gemini_client:
+            try:
+                # Check if it's a simple demo action or gymnastics
+                is_simple_action = skill in ['sitting_posture', 'standing_straight', 'arms_raised', 'thumbs_up', 't_pose', 'stretching']
+
+                if is_simple_action:
+                    prompt = f"""You are a friendly coach helping someone demonstrate a simple action: {skill_display}.
+
+This is for a software demo - the person is NOT an athlete, just testing the AI system. Provide brief, easy-to-follow instructions:
+1. Be casual and encouraging
+2. Explain what to do in simple terms (2-3 sentences)
+3. Mention this is easy and perfect for demos
+4. Keep it very short and conversational (will be read aloud)
+
+Start with "Let's try {skill_display}!" Keep it under 50 words."""
+                else:
+                    prompt = f"""You are an expert gymnastics coach teaching a beginner how to perform a {skill_display}.
+
+Provide clear, step-by-step instructions for how to perform this skill. Your instruction should:
+1. Be encouraging and supportive
+2. Explain the key body positions (where hands, feet, hips should be)
+3. Include 3-5 specific, actionable steps
+4. Mention important safety considerations
+5. Be spoken in a friendly, coaching voice (this will be read aloud)
+
+Keep it concise (2-3 short paragraphs max). Start with "Let's learn the {skill_display}!" """
+
+                response = gemini_client.models.generate_content(
+                    model='gemini-2.0-flash-exp',
+                    contents=[prompt]
+                )
+
+                instruction = response.text
+            except Exception as e:
+                print(f"Gemini error for instruction: {e}")
+                instruction = get_fallback_instruction(skill)
+        else:
+            instruction = get_fallback_instruction(skill)
+
+        return TrainingInstructionResponse(
+            success=True,
+            skill=skill,
+            instruction=instruction,
+            preparation_time=5  # 5 seconds to get ready
+        )
+
+    except Exception as e:
+        print(f"Error getting instruction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/training/assess")
+async def assess_training_attempt(request: TrainingAssessmentRequest):
+    """Assess user's attempt at performing a skill using Gemini Vision"""
+    try:
+        if not gemini_client:
+            raise HTTPException(
+                status_code=503,
+                detail="Gemini Vision API not available. Please set GEMINI_API_KEY in .env file"
+            )
+
+        skill = request.skill
+        skill_display = skill.replace('_', ' ').title()
+
+        # Decode base64 image
+        frame_data = request.frame.split(',')[1] if ',' in request.frame else request.frame
+        frame_bytes = base64.b64decode(frame_data)
+
+        # Convert to numpy array
+        nparr = np.frombuffer(frame_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if frame is None:
+            raise HTTPException(status_code=400, detail="Failed to decode frame")
+
+        # Convert BGR to RGB
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Encode frame to JPEG
+        _, buffer = cv2.imencode('.jpg', frame_rgb)
+        image_bytes = buffer.tobytes()
+
+        # Create assessment prompt based on skill type
+        is_simple_action = skill in ['sitting_posture', 'standing_straight', 'arms_raised', 'thumbs_up', 't_pose', 'stretching']
+
+        if is_simple_action:
+            prompt = f"""You are analyzing someone demonstrating {skill_display} for a software demo.
+
+Give quick, friendly, real-time feedback:
+1. Are they doing it correctly? (YES/NO)
+2. One simple tip to improve (if needed)
+3. Brief encouragement (1 sentence)
+
+Keep it SHORT and conversational - this is continuous feedback. Format:
+CORRECT: [YES/NO]
+TIP: [one quick tip or "Looking good!"]
+FEEDBACK: [one encouraging sentence]
+
+Be casual and positive - they're just testing the system!"""
+        else:
+            prompt = f"""You are an expert gymnastics coach assessing a student's attempt at performing a {skill_display}.
+
+Analyze the image and provide:
+1. Whether they are performing the skill correctly (YES/NO)
+2. 2-3 specific corrections if needed (what to fix)
+3. 1-2 things they're doing well
+4. Encouraging feedback to keep them motivated
+
+Format your response as:
+CORRECT: [YES/NO]
+CORRECTIONS:
+- [correction 1 if needed]
+- [correction 2 if needed]
+STRENGTHS:
+- [strength 1]
+- [strength 2]
+ENCOURAGEMENT: [motivating message]
+
+Be supportive, specific, and actionable. This is a learning environment, not a competition."""
+
+        # Call Gemini Vision API
+        response = gemini_client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents=[
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type='image/jpeg',
+                ),
+                prompt
+            ]
+        )
+
+        # Parse response
+        assessment_text = response.text
+        is_correct = 'CORRECT: YES' in assessment_text.upper()
+
+        # Extract corrections
+        corrections = []
+        if 'CORRECTIONS:' in assessment_text:
+            corrections_section = assessment_text.split('CORRECTIONS:')[1].split('STRENGTHS:')[0]
+            corrections = [line.strip('- ').strip() for line in corrections_section.split('\n') if line.strip().startswith('-')]
+
+        # Extract encouragement
+        encouragement = "Keep practicing! You're doing great!"
+        if 'ENCOURAGEMENT:' in assessment_text:
+            encouragement = assessment_text.split('ENCOURAGEMENT:')[1].strip().split('\n')[0]
+
+        return TrainingAssessmentResponse(
+            success=True,
+            assessment=assessment_text,
+            is_correct=is_correct,
+            corrections=corrections if corrections else ["Great job! Keep practicing to maintain consistency."],
+            encouragement=encouragement
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in training assessment: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def get_fallback_instruction(skill: str) -> str:
+    """Get fallback instruction when Gemini is not available"""
+    instructions = {
+        'sitting_posture': """Let's practice Good Sitting Posture!
+
+Sit comfortably in your chair with your feet flat on the floor. Keep your back straight and shoulders relaxed. Your head should be level, not tilted forward or back. Place your hands comfortably on your desk or lap.
+
+Key points: Shoulders should be back and down, not hunched. Your screen should be at eye level. Keep a small gap between the back of your knees and the chair seat. This is perfect for developers who sit all day!""",
+
+        'standing_straight': """Let's practice Standing Straight!
+
+Stand with your feet shoulder-width apart. Distribute your weight evenly on both feet. Keep your shoulders back and relaxed, not tensed up. Your head should be level, chin parallel to the ground.
+
+Focus on: Imagine a string pulling you up from the top of your head. Keep your core engaged but breathe naturally. Arms should hang naturally at your sides. This is great posture for standing meetings!""",
+
+        'arms_raised': """Let's practice Arms Raised!
+
+Start standing straight. Slowly raise both arms straight up overhead, reaching toward the ceiling. Keep your arms straight and parallel to each other. Your palms can face forward or toward each other.
+
+Remember: Keep your shoulders relaxed, don't shrug them up toward your ears. Your core should stay engaged. This is a simple movement that's easy to demo and great for stretching!""",
+
+        'thumbs_up': """Let's try Thumbs Up!
+
+Simply raise one or both hands and give a thumbs up gesture! Keep your hand at chest height or higher so the camera can see it clearly. Make sure your thumb is clearly extended upward.
+
+This is perfect for: Testing gesture recognition, simple demos, and showing approval. Super easy for anyone to do!""",
+
+        't_pose': """Let's practice the T-Pose!
+
+Stand straight with your feet shoulder-width apart. Extend both arms out to your sides, parallel to the ground. Your body should form a 'T' shape when viewed from the front.
+
+Key points: Keep your arms straight and level with your shoulders. Palms can face down or forward. This is a classic pose used in gaming and animation - perfect for demos!""",
+
+        'stretching': """Let's do a Simple Desk Stretch!
+
+Sit or stand comfortably. Reach both arms overhead and interlace your fingers. Gently lean to one side for a few seconds, then the other. You can also do shoulder rolls: roll your shoulders backward in a circular motion.
+
+Great for: Desk workers, developers, and anyone who needs a quick stretch break. Easy to demonstrate and feels good too!"""
+    }
+
+    return instructions.get(skill, f"""Let's practice {skill.replace('_', ' ').title()}!
+
+This is a simple action that anyone can do - perfect for demos and testing! Just follow the instructions, position yourself so the camera can see you clearly, and let the AI coach guide you.
+
+Remember: No athletic skills needed! This is designed to be easy and fun to demonstrate.""")
 
 
 # Mount static files AFTER all routes are defined
