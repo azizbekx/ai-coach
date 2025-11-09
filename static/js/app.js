@@ -213,40 +213,35 @@ class GymnasticsCoachApp {
         this.currentSkill = null;
         this.trainingStream = null;
         this.currentInstruction = null;
+        this.coachingInterval = null;
+        this.lastFeedbackTime = 0;
 
         // Skill selection
         const skillCards = document.querySelectorAll('.skill-card');
         skillCards.forEach(card => {
             card.addEventListener('click', () => {
                 const skill = card.dataset.skill;
-                this.startSkillTraining(skill);
+                this.startRealTimeCoaching(skill);
             });
         });
 
-        // Instruction phase buttons
-        document.getElementById('readInstructionBtn').addEventListener('click', () => {
-            this.readInstructionAloud();
-        });
+        // Control buttons
+        const readBtn = document.getElementById('readInstructionBtn');
+        if (readBtn) {
+            readBtn.addEventListener('click', () => {
+                this.readInstructionAloud();
+            });
+        }
 
-        document.getElementById('readyToTryBtn').addEventListener('click', () => {
-            this.startPreparationPhase();
-        });
-
-        // Assessment phase buttons
-        document.getElementById('tryAgainBtn').addEventListener('click', () => {
-            this.resetToInstruction();
-        });
-
-        document.getElementById('newSkillBtn').addEventListener('click', () => {
-            this.backToSkillSelection();
-        });
-
-        document.getElementById('backToSkillsBtn').addEventListener('click', () => {
-            this.backToSkillSelection();
-        });
+        const stopBtn = document.getElementById('stopCoachingBtn');
+        if (stopBtn) {
+            stopBtn.addEventListener('click', () => {
+                this.stopCoaching();
+            });
+        }
     }
 
-    async startSkillTraining(skill) {
+    async startRealTimeCoaching(skill) {
         this.currentSkill = skill;
 
         // Show training flow, hide skill selection
@@ -254,11 +249,16 @@ class GymnasticsCoachApp {
         document.getElementById('trainingFlow').style.display = 'block';
 
         // Update skill name
-        const skillName = skill.replace('_', ' ').charAt(0).toUpperCase() + skill.replace('_', ' ').slice(1);
-        document.getElementById('trainingSkillName').textContent = `${skillName} Training`;
+        const skillName = skill.replace('_', ' ').split('_').map(word =>
+            word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+        document.getElementById('trainingSkillName').textContent = `${skillName} - Live Coaching`;
 
         // Load instruction
         await this.loadInstruction(skill);
+
+        // Start webcam and coaching
+        await this.startLiveCoaching();
     }
 
     async loadInstruction(skill) {
@@ -318,13 +318,9 @@ class GymnasticsCoachApp {
         this.speechSynthesis.speak(utterance);
     }
 
-    async startPreparationPhase() {
-        // Hide instruction, show preparation
-        document.getElementById('instructionPhase').style.display = 'none';
-        document.getElementById('preparationPhase').style.display = 'block';
-
-        // Start webcam
+    async startLiveCoaching() {
         try {
+            // Start webcam
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: 1280 },
@@ -337,50 +333,47 @@ class GymnasticsCoachApp {
             const video = document.getElementById('trainingVideo');
             video.srcObject = stream;
 
-            // Start countdown
-            this.startCountdown();
+            // Wait for video to be ready
+            await new Promise(resolve => {
+                video.onloadedmetadata = () => {
+                    video.play();
+                    resolve();
+                };
+            });
+
+            // Start continuous coaching (analyze every 4 seconds)
+            this.coachingInterval = setInterval(() => {
+                this.analyzeAndCoach();
+            }, 4000);
+
+            // Do first analysis after 1 second
+            setTimeout(() => this.analyzeAndCoach(), 1000);
 
         } catch (error) {
             console.error('Webcam error:', error);
             alert('Failed to access webcam: ' + error.message);
-            this.backToSkillSelection();
+            this.stopCoaching();
         }
     }
 
-    startCountdown() {
-        let count = 5;
-        const countdownEl = document.getElementById('countdownNumber');
+    async analyzeAndCoach() {
+        if (!this.trainingStream || !this.currentSkill) return;
 
-        const interval = setInterval(() => {
-            count--;
-            countdownEl.textContent = count;
-
-            if (count === 0) {
-                clearInterval(interval);
-                this.captureAndAssess();
-            }
-        }, 1000);
-    }
-
-    async captureAndAssess() {
-        // Hide preparation, show assessment
-        document.getElementById('preparationPhase').style.display = 'none';
-        document.getElementById('assessmentPhase').style.display = 'block';
-        document.getElementById('assessmentResult').style.display = 'none';
-        document.getElementById('assessmentStatus').style.display = 'block';
-
-        // Capture frame
         const video = document.getElementById('trainingVideo');
         const canvas = document.getElementById('trainingCanvas');
         const ctx = canvas.getContext('2d');
 
+        // Capture current frame
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0);
 
-        const frameData = canvas.toDataURL('image/jpeg', 0.9);
+        const frameData = canvas.toDataURL('image/jpeg', 0.8);
 
-        // Send for assessment
+        // Update UI to show analyzing
+        const feedbackEl = document.getElementById('liveFeedbackText');
+        feedbackEl.innerHTML = '<div class="feedback-waiting"><span class="pulse-dot"></span> Analyzing...</div>';
+
         try {
             const response = await fetch('/api/training/assess', {
                 method: 'POST',
@@ -392,111 +385,84 @@ class GymnasticsCoachApp {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Assessment failed');
+                throw new Error('Assessment failed');
             }
 
             const result = await response.json();
-            this.displayAssessment(result);
+            this.displayLiveCoachingFeedback(result);
 
         } catch (error) {
-            console.error('Assessment error:', error);
-            document.getElementById('assessmentStatus').innerHTML = `
-                <div class="status-icon">⚠️</div>
-                <h3>Assessment Error</h3>
-                <p>${error.message}</p>
-                <p>Make sure GEMINI_API_KEY is set in your .env file</p>
-            `;
+            console.error('Coaching error:', error);
+            feedbackEl.innerHTML = `<div class="feedback-error">⚠️ ${error.message}<br><small>Make sure GEMINI_API_KEY is set</small></div>`;
         }
     }
 
-    displayAssessment(result) {
-        // Hide status, show result
-        document.getElementById('assessmentStatus').style.display = 'none';
-        document.getElementById('assessmentResult').style.display = 'block';
+    displayLiveCoachingFeedback(result) {
+        const feedbackEl = document.getElementById('liveFeedbackText');
+        const timestampEl = document.getElementById('feedbackTimestamp');
 
-        // Update result icon and title
-        const resultIcon = document.getElementById('resultIcon');
-        const resultTitle = document.getElementById('resultTitle');
+        // Format feedback based on what we have
+        let feedbackHTML = '';
 
         if (result.is_correct) {
-            resultIcon.textContent = '✅';
-            resultIcon.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-            resultTitle.textContent = 'Excellent Form!';
+            feedbackHTML += '<div class="feedback-positive">✅ <strong>Great!</strong> ';
         } else {
-            resultIcon.textContent = '📝';
-            resultIcon.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
-            resultTitle.textContent = 'Good Effort! Let\'s Improve';
+            feedbackHTML += '<div class="feedback-improve">📝 <strong>Keep going!</strong> ';
         }
 
-        // Display full assessment
-        document.getElementById('fullAssessment').innerHTML =
-            result.assessment.replace(/\n/g, '<br>');
+        // Add main feedback
+        if (result.corrections && result.corrections.length > 0) {
+            feedbackHTML += result.corrections[0];
+        } else if (result.encouragement) {
+            feedbackHTML += result.encouragement;
+        }
 
-        // Display corrections
-        const correctionsList = document.getElementById('correctionsList');
-        correctionsList.innerHTML = '';
-        result.corrections.forEach(correction => {
-            const li = document.createElement('li');
-            li.textContent = correction;
-            correctionsList.appendChild(li);
-        });
+        feedbackHTML += '</div>';
 
-        // Display encouragement
-        document.getElementById('encouragementText').textContent = result.encouragement;
+        // Add full assessment if available
+        if (result.assessment && result.assessment.length > 50) {
+            feedbackHTML += `<div class="feedback-details"><small>${result.assessment.substring(0, 200)}...</small></div>`;
+        }
 
-        // Read encouragement aloud
-        setTimeout(() => {
-            const utterance = new SpeechSynthesisUtterance(result.encouragement);
-            utterance.rate = 1.0;
+        feedbackEl.innerHTML = feedbackHTML;
+
+        // Update timestamp
+        const now = new Date();
+        timestampEl.textContent = `Last updated: ${now.toLocaleTimeString()}`;
+
+        // Speak the first correction or encouragement (throttled)
+        const nowTime = Date.now();
+        if (nowTime - this.lastFeedbackTime > 8000) { // At most every 8 seconds
+            this.lastFeedbackTime = nowTime;
+
+            const textToSpeak = result.corrections[0] || result.encouragement || 'Looking good!';
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.rate = 0.95;
             this.speechSynthesis.speak(utterance);
-        }, 500);
+        }
     }
 
-    resetToInstruction() {
-        // Stop training stream
+    stopCoaching() {
+        // Stop coaching interval
+        if (this.coachingInterval) {
+            clearInterval(this.coachingInterval);
+            this.coachingInterval = null;
+        }
+
+        // Stop webcam
         if (this.trainingStream) {
             this.trainingStream.getTracks().forEach(track => track.stop());
             this.trainingStream = null;
         }
 
-        // Reset to instruction phase
-        document.getElementById('preparationPhase').style.display = 'none';
-        document.getElementById('assessmentPhase').style.display = 'none';
-        document.getElementById('instructionPhase').style.display = 'block';
-
-        // Reset countdown
-        document.getElementById('countdownNumber').textContent = '5';
-
-        // Read instruction again
-        setTimeout(() => {
-            this.readInstructionAloud();
-        }, 300);
-    }
-
-    backToSkillSelection() {
-        // Stop training stream
-        if (this.trainingStream) {
-            this.trainingStream.getTracks().forEach(track => track.stop());
-            this.trainingStream = null;
-        }
-
-        // Stop any speech
+        // Stop speech
         if (this.speechSynthesis) {
             this.speechSynthesis.cancel();
         }
 
-        // Reset phases
-        document.getElementById('instructionPhase').style.display = 'block';
-        document.getElementById('preparationPhase').style.display = 'none';
-        document.getElementById('assessmentPhase').style.display = 'none';
-
-        // Show skill selection
+        // Back to skill selection
         document.getElementById('trainingFlow').style.display = 'none';
         document.getElementById('skillSelection').style.display = 'block';
-
-        // Reset countdown
-        document.getElementById('countdownNumber').textContent = '5';
     }
 
     stopTraining() {

@@ -418,7 +418,21 @@ async def get_training_instruction(request: TrainingInstructionRequest):
         # If Gemini is available, use it for better instructions
         if gemini_client:
             try:
-                prompt = f"""You are an expert gymnastics coach teaching a beginner how to perform a {skill_display}.
+                # Check if it's a simple demo action or gymnastics
+                is_simple_action = skill in ['sitting_posture', 'standing_straight', 'arms_raised', 'thumbs_up', 't_pose', 'stretching']
+
+                if is_simple_action:
+                    prompt = f"""You are a friendly coach helping someone demonstrate a simple action: {skill_display}.
+
+This is for a software demo - the person is NOT an athlete, just testing the AI system. Provide brief, easy-to-follow instructions:
+1. Be casual and encouraging
+2. Explain what to do in simple terms (2-3 sentences)
+3. Mention this is easy and perfect for demos
+4. Keep it very short and conversational (will be read aloud)
+
+Start with "Let's try {skill_display}!" Keep it under 50 words."""
+                else:
+                    prompt = f"""You are an expert gymnastics coach teaching a beginner how to perform a {skill_display}.
 
 Provide clear, step-by-step instructions for how to perform this skill. Your instruction should:
 1. Be encouraging and supportive
@@ -484,8 +498,25 @@ async def assess_training_attempt(request: TrainingAssessmentRequest):
         _, buffer = cv2.imencode('.jpg', frame_rgb)
         image_bytes = buffer.tobytes()
 
-        # Create assessment prompt
-        prompt = f"""You are an expert gymnastics coach assessing a student's attempt at performing a {skill_display}.
+        # Create assessment prompt based on skill type
+        is_simple_action = skill in ['sitting_posture', 'standing_straight', 'arms_raised', 'thumbs_up', 't_pose', 'stretching']
+
+        if is_simple_action:
+            prompt = f"""You are analyzing someone demonstrating {skill_display} for a software demo.
+
+Give quick, friendly, real-time feedback:
+1. Are they doing it correctly? (YES/NO)
+2. One simple tip to improve (if needed)
+3. Brief encouragement (1 sentence)
+
+Keep it SHORT and conversational - this is continuous feedback. Format:
+CORRECT: [YES/NO]
+TIP: [one quick tip or "Looking good!"]
+FEEDBACK: [one encouraging sentence]
+
+Be casual and positive - they're just testing the system!"""
+        else:
+            prompt = f"""You are an expert gymnastics coach assessing a student's attempt at performing a {skill_display}.
 
 Analyze the image and provide:
 1. Whether they are performing the skill correctly (YES/NO)
@@ -552,36 +583,48 @@ Be supportive, specific, and actionable. This is a learning environment, not a c
 def get_fallback_instruction(skill: str) -> str:
     """Get fallback instruction when Gemini is not available"""
     instructions = {
-        'handstand': """Let's learn the Handstand!
+        'sitting_posture': """Let's practice Good Sitting Posture!
 
-Start by placing your hands shoulder-width apart on the floor. Keep your arms straight and strong. Kick one leg up towards the ceiling while keeping your core tight. Bring your other leg up to meet it. Focus on pushing through your shoulders and keeping your body in a straight line from your hands to your toes.
+Sit comfortably in your chair with your feet flat on the floor. Keep your back straight and shoulders relaxed. Your head should be level, not tilted forward or back. Place your hands comfortably on your desk or lap.
 
-Important: Start against a wall for safety. Keep your head neutral and look at the floor between your hands. Engage your core throughout the entire movement.""",
+Key points: Shoulders should be back and down, not hunched. Your screen should be at eye level. Keep a small gap between the back of your knees and the chair seat. This is perfect for developers who sit all day!""",
 
-        'bridge': """Let's learn the Bridge!
+        'standing_straight': """Let's practice Standing Straight!
 
-Lie on your back with your knees bent and feet flat on the floor, hip-width apart. Place your hands by your ears with fingers pointing toward your shoulders. Press through your hands and feet to lift your hips high toward the ceiling. Straighten your arms as much as possible.
+Stand with your feet shoulder-width apart. Distribute your weight evenly on both feet. Keep your shoulders back and relaxed, not tensed up. Your head should be level, chin parallel to the ground.
 
-Key points: Keep your feet parallel, push your chest toward the wall behind you, and engage your glutes. Breathe steadily and don't forget to warm up your shoulders first!""",
+Focus on: Imagine a string pulling you up from the top of your head. Keep your core engaged but breathe naturally. Arms should hang naturally at your sides. This is great posture for standing meetings!""",
 
-        'split': """Let's learn the Split!
+        'arms_raised': """Let's practice Arms Raised!
 
-Start in a lunge position with your front knee bent and back knee on the ground. Slowly slide your front foot forward and back foot backward, lowering your hips toward the ground. Keep your hips square and facing forward throughout the movement.
+Start standing straight. Slowly raise both arms straight up overhead, reaching toward the ceiling. Keep your arms straight and parallel to each other. Your palms can face forward or toward each other.
 
-Safety first: Go slowly! Never bounce. Only go as far as you can while maintaining control. Keep your chest lifted and hands on the ground for support.""",
+Remember: Keep your shoulders relaxed, don't shrug them up toward your ears. Your core should stay engaged. This is a simple movement that's easy to demo and great for stretching!""",
 
-        'pike': """Let's learn the Pike!
+        'thumbs_up': """Let's try Thumbs Up!
 
-Start standing with feet together. Keep your legs completely straight as you fold forward from your hips. Reach your hands toward the ground, keeping your back straight. Your body should form an inverted 'V' shape.
+Simply raise one or both hands and give a thumbs up gesture! Keep your hand at chest height or higher so the camera can see it clearly. Make sure your thumb is clearly extended upward.
 
-Focus on: Keeping knees locked, engaging your core, and reaching your chest toward your thighs. If you can't touch the ground, that's okay! Flexibility takes time."""
+This is perfect for: Testing gesture recognition, simple demos, and showing approval. Super easy for anyone to do!""",
+
+        't_pose': """Let's practice the T-Pose!
+
+Stand straight with your feet shoulder-width apart. Extend both arms out to your sides, parallel to the ground. Your body should form a 'T' shape when viewed from the front.
+
+Key points: Keep your arms straight and level with your shoulders. Palms can face down or forward. This is a classic pose used in gaming and animation - perfect for demos!""",
+
+        'stretching': """Let's do a Simple Desk Stretch!
+
+Sit or stand comfortably. Reach both arms overhead and interlace your fingers. Gently lean to one side for a few seconds, then the other. You can also do shoulder rolls: roll your shoulders backward in a circular motion.
+
+Great for: Desk workers, developers, and anyone who needs a quick stretch break. Easy to demonstrate and feels good too!"""
     }
 
-    return instructions.get(skill, f"""Let's learn the {skill.replace('_', ' ').title()}!
+    return instructions.get(skill, f"""Let's practice {skill.replace('_', ' ').title()}!
 
-This is a fundamental gymnastics skill that requires focus and practice. Start by understanding the basic body positions. Keep your core engaged, maintain proper alignment, and move with control.
+This is a simple action that anyone can do - perfect for demos and testing! Just follow the instructions, position yourself so the camera can see you clearly, and let the AI coach guide you.
 
-Remember: Safety first! Warm up properly, use mats when appropriate, and never push beyond your limits. Progress gradually and celebrate small improvements.""")
+Remember: No athletic skills needed! This is designed to be easy and fun to demonstrate.""")
 
 
 # Mount static files AFTER all routes are defined

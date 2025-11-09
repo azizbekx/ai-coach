@@ -110,129 +110,89 @@
             <div class="training-section">
                 <!-- Skill Selection -->
                 <div id="skillSelection" class="skill-selection">
-                    <h2>Choose a Skill to Learn</h2>
-                    <p class="training-subtitle">AI will guide you step-by-step with audio instructions and visual feedback</p>
+                    <h2>Choose an Action to Practice</h2>
+                    <p class="training-subtitle">Real-time AI coaching with live feedback - Perfect for demos!</p>
 
                     <div class="skills-grid" id="skillsGrid">
-                        <div class="skill-card" data-skill="handstand">
+                        <div class="skill-card" data-skill="sitting_posture">
+                            <div class="skill-icon">🪑</div>
+                            <h3>Sitting Posture</h3>
+                            <p>Learn proper desk posture for developers</p>
+                        </div>
+                        <div class="skill-card" data-skill="standing_straight">
+                            <div class="skill-icon">🧍</div>
+                            <h3>Standing Straight</h3>
+                            <p>Practice good standing alignment</p>
+                        </div>
+                        <div class="skill-card" data-skill="arms_raised">
+                            <div class="skill-icon">🙌</div>
+                            <h3>Arms Raised</h3>
+                            <p>Raise both arms overhead correctly</p>
+                        </div>
+                        <div class="skill-card" data-skill="thumbs_up">
+                            <div class="skill-icon">👍</div>
+                            <h3>Thumbs Up</h3>
+                            <p>Simple gesture recognition demo</p>
+                        </div>
+                        <div class="skill-card" data-skill="t_pose">
+                            <div class="skill-icon">🤷</div>
+                            <h3>T-Pose</h3>
+                            <p>Arms extended horizontally</p>
+                        </div>
+                        <div class="skill-card" data-skill="stretching">
                             <div class="skill-icon">🤸</div>
-                            <h3>Handstand</h3>
-                            <p>Learn proper hand placement and body alignment</p>
-                        </div>
-                        <div class="skill-card" data-skill="bridge">
-                            <div class="skill-icon">🌉</div>
-                            <h3>Bridge</h3>
-                            <p>Master back flexibility and shoulder strength</p>
-                        </div>
-                        <div class="skill-card" data-skill="split">
-                            <div class="skill-icon">🧘</div>
-                            <h3>Split</h3>
-                            <p>Improve flexibility and hip alignment</p>
-                        </div>
-                        <div class="skill-card" data-skill="pike">
-                            <div class="skill-icon">📐</div>
-                            <h3>Pike</h3>
-                            <p>Learn proper forward fold technique</p>
+                            <h3>Simple Stretch</h3>
+                            <p>Basic stretching for desk workers</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Training Flow -->
+                <!-- Training Flow - Real-time Coaching -->
                 <div id="trainingFlow" class="training-flow" style="display: none;">
                     <div class="training-header">
-                        <h2 id="trainingSkillName">Handstand Training</h2>
-                        <button id="backToSkillsBtn" class="back-btn">← Choose Different Skill</button>
+                        <h2 id="trainingSkillName">Live Coaching Session</h2>
+                        <button id="stopCoachingBtn" class="stop-btn">Stop Coaching</button>
                     </div>
 
-                    <!-- Phase 1: Instruction -->
-                    <div id="instructionPhase" class="training-phase">
-                        <div class="phase-indicator">
-                            <span class="phase-number">1</span>
-                            <span class="phase-name">Instruction</span>
-                        </div>
-
-                        <div class="instruction-content">
-                            <div class="instruction-icon">🎯</div>
-                            <h3>Listen to Your Coach</h3>
-                            <div id="instructionText" class="instruction-text">
-                                Loading instructions...
-                            </div>
-                            <div class="instruction-controls">
-                                <button id="readInstructionBtn" class="primary-btn">
-                                    <span>🔊</span> Read Instructions Aloud
-                                </button>
-                                <button id="readyToTryBtn" class="primary-btn">
-                                    I'm Ready to Try →
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Phase 2: Preparation -->
-                    <div id="preparationPhase" class="training-phase" style="display: none;">
-                        <div class="phase-indicator">
-                            <span class="phase-number">2</span>
-                            <span class="phase-name">Get Ready</span>
-                        </div>
-
-                        <div class="preparation-content">
-                            <div class="countdown-circle">
-                                <div class="countdown-number" id="countdownNumber">5</div>
-                            </div>
-                            <h3>Get into position...</h3>
-                            <p>Make sure you're visible in the camera</p>
-
-                            <div class="webcam-preview">
+                    <!-- Live Coaching View -->
+                    <div class="live-coaching-container">
+                        <div class="video-section">
+                            <div class="live-video-panel">
+                                <h4>Your Camera</h4>
                                 <video id="trainingVideo" autoplay playsinline></video>
                                 <canvas id="trainingCanvas" style="display: none;"></canvas>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Phase 3: Assessment -->
-                    <div id="assessmentPhase" class="training-phase" style="display: none;">
-                        <div class="phase-indicator">
-                            <span class="phase-number">3</span>
-                            <span class="phase-name">Assessment</span>
-                        </div>
-
-                        <div class="assessment-content">
-                            <div class="assessment-status" id="assessmentStatus">
-                                <div class="status-icon">🔍</div>
-                                <h3>Analyzing your form...</h3>
+                        <div class="coaching-panel">
+                            <div class="instruction-box">
+                                <h4>📋 What to Do</h4>
+                                <div id="instructionText" class="instruction-text">
+                                    Starting coaching session...
+                                </div>
+                                <button id="readInstructionBtn" class="icon-btn">
+                                    🔊 Speak Instructions
+                                </button>
                             </div>
 
-                            <div id="assessmentResult" class="assessment-result" style="display: none;">
-                                <div class="result-header">
-                                    <div id="resultIcon" class="result-icon">✅</div>
-                                    <h3 id="resultTitle">Great Job!</h3>
-                                </div>
-
-                                <div class="result-sections">
-                                    <div class="result-section">
-                                        <h4>📋 Full Assessment</h4>
-                                        <div id="fullAssessment" class="assessment-text"></div>
-                                    </div>
-
-                                    <div class="result-section corrections-section">
-                                        <h4>🎯 What to Improve</h4>
-                                        <ul id="correctionsList" class="corrections-list"></ul>
-                                    </div>
-
-                                    <div class="result-section encouragement-section">
-                                        <h4>💪 Keep Going!</h4>
-                                        <p id="encouragementText" class="encouragement-text"></p>
+                            <div class="live-feedback-box">
+                                <h4>🤖 AI Coach Feedback</h4>
+                                <div id="liveFeedbackText" class="live-feedback-text">
+                                    <div class="feedback-waiting">
+                                        <span class="pulse-dot"></span>
+                                        Analyzing your posture...
                                     </div>
                                 </div>
+                                <div class="feedback-timestamp" id="feedbackTimestamp">-</div>
+                            </div>
 
-                                <div class="assessment-controls">
-                                    <button id="tryAgainBtn" class="primary-btn">
-                                        🔄 Try Again
-                                    </button>
-                                    <button id="newSkillBtn" class="secondary-btn">
-                                        Choose Different Skill
-                                    </button>
-                                </div>
+                            <div class="quick-tips-box">
+                                <h4>💡 Quick Tips</h4>
+                                <ul id="quickTipsList" class="quick-tips-list">
+                                    <li>Position yourself so your full body is visible</li>
+                                    <li>Make sure you have good lighting</li>
+                                    <li>Listen to the voice feedback</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
