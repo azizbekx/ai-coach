@@ -1,0 +1,15 @@
+# Core dependencies
+mediapipe==0.10.9
+opencv-python==4.9.0.80
+numpy==1.24.3
+scipy==1.11.4
+
+# Visualization and UI
+matplotlib==3.8.2
+Pillow==10.2.0
+
+# Data processing
+pandas==2.1.4
+
+# Optional: For advanced features
+scikit-learn==1.3.2
