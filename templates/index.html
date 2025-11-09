@@ -108,6 +108,26 @@
         <!-- AI Training Mode -->
         <div id="trainingMode" class="mode-content">
             <div class="training-section">
+                <!-- Training Mode Selector -->
+                <div class="training-mode-selector">
+                    <button class="training-mode-btn active" data-training-mode="single">
+                        Single Action
+                    </button>
+                    <button class="training-mode-btn" data-training-mode="warmup">
+                        Warm-Up Sequence
+                    </button>
+                </div>
+
+                <!-- Warm-Up Sequences -->
+                <div id="warmupSelection" class="warmup-selection" style="display: none;">
+                    <h2>Choose a Warm-Up Routine</h2>
+                    <p class="training-subtitle">Complete a sequence of actions with AI guidance</p>
+
+                    <div class="warmup-grid" id="warmupGrid">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+
                 <!-- Skill Selection -->
                 <div id="skillSelection" class="skill-selection">
                     <h2>Choose an Action to Practice</h2>
@@ -193,6 +213,103 @@
                                     <li>Make sure you have good lighting</li>
                                     <li>Listen to the voice feedback</li>
                                 </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Warm-Up Flow -->
+                <div id="warmupFlow" class="warmup-flow" style="display: none;">
+                    <div class="warmup-header">
+                        <h2 id="warmupSequenceName">Warm-Up Sequence</h2>
+                        <button id="stopWarmupBtn" class="stop-btn">Stop Warm-Up</button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="warmup-progress">
+                        <div class="progress-info">
+                            <span id="currentActionNumber">1</span> of <span id="totalActions">5</span> actions
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" id="warmupProgressBar"></div>
+                        </div>
+                    </div>
+
+                    <!-- Current Action Display -->
+                    <div class="current-action-banner">
+                        <div class="action-icon" id="currentActionIcon">🤸</div>
+                        <div class="action-info">
+                            <h3 id="currentActionName">Standing Straight</h3>
+                            <p id="currentActionDuration">Hold for 5 seconds</p>
+                        </div>
+                    </div>
+
+                    <!-- Warm-Up Coaching View -->
+                    <div class="live-coaching-container">
+                        <div class="video-section">
+                            <div class="live-video-panel">
+                                <h4>Your Camera</h4>
+                                <video id="warmupVideo" autoplay playsinline></video>
+                                <canvas id="warmupCanvas" style="display: none;"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="coaching-panel">
+                            <div class="instruction-box">
+                                <h4>📋 Instructions</h4>
+                                <div id="warmupInstructionText" class="instruction-text">
+                                    Loading instructions...
+                                </div>
+                                <button id="readWarmupInstructionBtn" class="icon-btn">
+                                    🔊 Speak Instructions
+                                </button>
+                            </div>
+
+                            <div class="live-feedback-box">
+                                <h4>🤖 AI Coach Feedback</h4>
+                                <div id="warmupFeedbackText" class="live-feedback-text">
+                                    <div class="feedback-waiting">
+                                        <span class="pulse-dot"></span>
+                                        Get into position...
+                                    </div>
+                                </div>
+                                <div id="warmupCorrectIndicator" class="correct-indicator" style="display: none;">
+                                    ✅ Correct! Moving to next action...
+                                </div>
+                            </div>
+
+                            <div class="actions-list-box">
+                                <h4>📝 Sequence</h4>
+                                <ul id="warmupActionsList" class="warmup-actions-list">
+                                    <!-- Will be populated dynamically -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Completion Screen -->
+                    <div id="warmupCompletion" class="warmup-completion" style="display: none;">
+                        <div class="completion-content">
+                            <div class="completion-icon">🎉</div>
+                            <h2>Warm-Up Complete!</h2>
+                            <p>Great job! You've completed all actions in the sequence.</p>
+                            <div class="completion-stats">
+                                <div class="stat">
+                                    <span class="stat-number" id="completionTime">0:00</span>
+                                    <span class="stat-label">Time</span>
+                                </div>
+                                <div class="stat">
+                                    <span class="stat-number" id="completionActions">5</span>
+                                    <span class="stat-label">Actions</span>
+                                </div>
+                            </div>
+                            <div class="completion-actions">
+                                <button id="doAnotherWarmupBtn" class="primary-btn">
+                                    🔄 Do Another Warm-Up
+                                </button>
+                                <button id="backToMenuBtn" class="secondary-btn">
+                                    ← Back to Menu
+                                </button>
                             </div>
                         </div>
                     </div>

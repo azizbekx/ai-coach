@@ -1265,6 +1265,286 @@ body {
     background: #dc2626;
 }
 
+/* Warm-Up Sequences */
+.training-mode-selector {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.training-mode-btn {
+    padding: 12px 30px;
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.training-mode-btn.active {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.training-mode-btn:hover:not(.active) {
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+}
+
+.warmup-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 30px;
+}
+
+.warmup-card {
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 15px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.warmup-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary-color);
+    box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+}
+
+.warmup-icon {
+    font-size: 60px;
+    margin-bottom: 15px;
+}
+
+.warmup-card h3 {
+    font-size: 1.4rem;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+}
+
+.warmup-card p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-bottom: 15px;
+}
+
+.warmup-meta {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Warm-Up Flow */
+.warmup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.warmup-header h2 {
+    font-size: 1.8rem;
+    color: var(--text-primary);
+}
+
+.warmup-progress {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.progress-info {
+    text-align: center;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 12px;
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 10px;
+    transition: width 0.5s ease;
+}
+
+.current-action-banner {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 5px 15px rgba(99, 102, 241, 0.4);
+}
+
+.action-icon {
+    font-size: 50px;
+}
+
+.action-info h3 {
+    font-size: 1.6rem;
+    margin-bottom: 5px;
+    color: white;
+}
+
+.action-info p {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1rem;
+}
+
+.correct-indicator {
+    background: rgba(16, 185, 129, 0.2);
+    border: 2px solid var(--success-color);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+    color: var(--success-color);
+    font-weight: 600;
+    text-align: center;
+    animation: pulse 0.5s ease-in-out;
+}
+
+.actions-list-box {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.actions-list-box h4 {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+}
+
+.warmup-actions-list {
+    list-style: none;
+    padding: 0;
+}
+
+.warmup-action-item {
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+.warmup-action-item.completed {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success-color);
+}
+
+.warmup-action-item.current {
+    background: rgba(99, 102, 241, 0.2);
+    border: 2px solid var(--primary-color);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.action-status {
+    font-size: 1.2rem;
+}
+
+.action-name {
+    flex: 1;
+}
+
+/* Warm-Up Completion */
+.warmup-completion {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.completion-content {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.completion-icon {
+    font-size: 100px;
+    margin-bottom: 20px;
+    animation: bounceIn 0.6s ease-out;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.warmup-completion h2 {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    color: var(--text-primary);
+}
+
+.warmup-completion p {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    margin-bottom: 40px;
+}
+
+.completion-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.stat {
+    background: var(--bg-tertiary);
+    padding: 25px;
+    border-radius: 15px;
+}
+
+.stat-number {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: 8px;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+.completion-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .header h1 {
@@ -1295,14 +1575,20 @@ body {
         grid-template-columns: 1fr;
     }
 
-    .training-header {
+    .warmup-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .training-header,
+    .warmup-header {
         flex-direction: column;
         gap: 15px;
         text-align: center;
     }
 
     .instruction-controls,
-    .assessment-controls {
+    .assessment-controls,
+    .completion-actions {
         flex-direction: column;
     }
 
@@ -1313,5 +1599,14 @@ body {
 
     .live-coaching-container {
         grid-template-columns: 1fr;
+    }
+
+    .completion-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .current-action-banner {
+        flex-direction: column;
+        text-align: center;
     }
 }

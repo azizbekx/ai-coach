@@ -391,6 +391,55 @@ async def health_check():
     }
 
 
+# Warm-up sequences
+WARMUP_SEQUENCES = {
+    'desk_worker': {
+        'name': 'Desk Worker Warm-Up',
+        'description': 'Perfect 5-minute warm-up for developers and desk workers',
+        'icon': '💻',
+        'actions': [
+            {'skill': 'sitting_posture', 'duration': 'Hold for 5 seconds'},
+            {'skill': 'arms_raised', 'duration': 'Hold for 5 seconds'},
+            {'skill': 'stretching', 'duration': 'Do 3 times'},
+            {'skill': 'standing_straight', 'duration': 'Hold for 5 seconds'},
+            {'skill': 't_pose', 'duration': 'Hold for 5 seconds'}
+        ]
+    },
+    'posture_check': {
+        'name': 'Posture Check Routine',
+        'description': 'Quick posture assessment - perfect for demos',
+        'icon': '🧍',
+        'actions': [
+            {'skill': 'standing_straight', 'duration': 'Hold steady'},
+            {'skill': 'sitting_posture', 'duration': 'Hold steady'},
+            {'skill': 't_pose', 'duration': 'Hold for 5 seconds'}
+        ]
+    },
+    'demo_quick': {
+        'name': 'Quick Demo',
+        'description': 'Fast 2-minute demo of AI coaching capabilities',
+        'icon': '⚡',
+        'actions': [
+            {'skill': 'thumbs_up', 'duration': 'Show clearly'},
+            {'skill': 'arms_raised', 'duration': 'Hold high'},
+            {'skill': 't_pose', 'duration': 'Hold steady'}
+        ]
+    },
+    'full_stretch': {
+        'name': 'Full Body Stretch',
+        'description': 'Complete stretching routine for energy boost',
+        'icon': '🤸',
+        'actions': [
+            {'skill': 'standing_straight', 'duration': 'Start position'},
+            {'skill': 'arms_raised', 'duration': 'Reach up'},
+            {'skill': 't_pose', 'duration': 'Arms out'},
+            {'skill': 'stretching', 'duration': 'Side to side'},
+            {'skill': 'sitting_posture', 'duration': 'Cool down'}
+        ]
+    }
+}
+
+
 @app.get("/api/skills")
 async def get_skills():
     """Get list of supported gymnastics skills"""
@@ -406,6 +455,33 @@ async def get_skills():
         })
 
     return {'skills': skills}
+
+
+@app.get("/api/warmup/sequences")
+async def get_warmup_sequences():
+    """Get list of available warm-up sequences"""
+    sequences = []
+    for seq_id, seq_data in WARMUP_SEQUENCES.items():
+        sequences.append({
+            'id': seq_id,
+            'name': seq_data['name'],
+            'description': seq_data['description'],
+            'icon': seq_data['icon'],
+            'action_count': len(seq_data['actions'])
+        })
+    return {'sequences': sequences}
+
+
+@app.get("/api/warmup/{sequence_id}")
+async def get_warmup_sequence(sequence_id: str):
+    """Get details of a specific warm-up sequence"""
+    if sequence_id not in WARMUP_SEQUENCES:
+        raise HTTPException(status_code=404, detail="Sequence not found")
+
+    return {
+        'success': True,
+        'sequence': WARMUP_SEQUENCES[sequence_id]
+    }
 
 
 @app.post("/api/training/instruction")
