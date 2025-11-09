@@ -119,38 +119,66 @@ class GymnasticsCoachApp {
     }
 
     async handleVideoUpload(file) {
-        // Hide upload area, show progress
-        document.getElementById('uploadArea').style.display = 'none';
-        document.getElementById('uploadProgress').style.display = 'block';
-        document.getElementById('uploadResults').style.display = 'none';
-
-        const formData = new FormData();
-        formData.append('video', file);
-
         try {
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
+            // Show progress UI
+            document.getElementById('uploadArea').style.display = 'none';
+            document.getElementById('uploadProgress').style.display = 'block';
+            document.getElementById('uploadResults').style.display = 'none';
 
-            progressText.textContent = 'Uploading video...';
-            progressFill.style.width = '10%';
+            // Reset all progress stages
+            this.resetProgressStages();
 
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
+            // Stage 1: Upload with real progress
+            this.updateStage('upload', 'in_progress', 'Uploading...', 0);
+
+            const formData = new FormData();
+            formData.append('video', file);
+
+            // Use XMLHttpRequest for upload progress
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    this.updateStage('upload', 'in_progress', `${percentComplete.toFixed(0)}%`, percentComplete);
+                }
             });
 
-            if (!response.ok) {
-                throw new Error('Upload failed');
+            const uploadPromise = new Promise((resolve, reject) => {
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        resolve(JSON.parse(xhr.responseText));
+                    } else {
+                        reject(new Error('Upload failed'));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('Upload failed'));
+                xhr.open('POST', '/api/upload');
+                xhr.send(formData);
+            });
+
+            // Stage 2: Start analysis animation after upload
+            setTimeout(() => {
+                this.updateStage('upload', 'completed', '100%', 100);
+                this.updateStage('analysis', 'in_progress', 'Processing frames...', 10);
+                this.startAnalysisSimulation();
+            }, 500);
+
+            const result = await uploadPromise();
+
+            // Stage 3: Complete analysis
+            this.stopAnalysisSimulation();
+            this.updateStage('analysis', 'completed', 'Complete', 100);
+
+            // Stage 4: Gemini (if available)
+            if (result.gemini_analysis) {
+                document.getElementById('geminiStage').style.display = 'block';
+                this.updateStage('gemini', 'in_progress', 'Generating insights...', 50);
+                await new Promise(resolve => setTimeout(resolve, 500));
+                this.updateStage('gemini', 'completed', 'Complete', 100);
             }
 
-            progressText.textContent = 'Processing video with AI...';
-            progressFill.style.width = '50%';
-
-            const result = await response.json();
-
-            progressFill.style.width = '100%';
-            progressText.textContent = 'Analysis complete!';
-
+            // Show results
             setTimeout(() => {
                 this.displayResults(result);
             }, 500);
@@ -159,6 +187,55 @@ class GymnasticsCoachApp {
             console.error('Upload error:', error);
             alert('Failed to process video: ' + error.message);
             this.resetUploadMode();
+        }
+    }
+
+    resetProgressStages() {
+        this.updateStage('upload', 'waiting', '0%', 0);
+        this.updateStage('analysis', 'waiting', 'Waiting...', 0);
+        this.updateStage('gemini', 'waiting', 'Waiting...', 0);
+        document.getElementById('geminiStage').style.display = 'none';
+        document.getElementById('analysisDetails').textContent = '';
+    }
+
+    updateStage(stage, status, statusText, progress) {
+        const icons = {
+            waiting: '⏳',
+            in_progress: '⚙️',
+            completed: '✅',
+            error: '❌'
+        };
+
+        const stageIcon = document.getElementById(`${stage}StageIcon`);
+        const stageStatus = document.getElementById(`${stage}StageStatus`);
+        const progressFill = document.getElementById(`${stage}ProgressFill`);
+
+        if (stageIcon) stageIcon.textContent = icons[status] || '⏳';
+        if (stageStatus) stageStatus.textContent = statusText;
+        if (progressFill) progressFill.style.width = `${progress}%`;
+    }
+
+    startAnalysisSimulation() {
+        let progress = 10;
+        this.analysisSimInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+
+            this.updateStage('analysis', 'in_progress', `${Math.floor(progress)}%`, progress);
+
+            const details = document.getElementById('analysisDetails');
+            if (details && progress > 30 && progress < 60) {
+                details.textContent = 'Detecting poses and measuring angles...';
+            } else if (progress >= 60 && progress < 90) {
+                details.textContent = 'Calculating scores and identifying errors...';
+            }
+        }, 800);
+    }
+
+    stopAnalysisSimulation() {
+        if (this.analysisSimInterval) {
+            clearInterval(this.analysisSimInterval);
+            this.analysisSimInterval = null;
         }
     }
 
@@ -341,26 +418,36 @@ class GymnasticsCoachApp {
         const canvas = document.getElementById('webcamCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Analyze at ~10 FPS to reduce load
+        let isAnalyzing = false;
+
+        // Analyze at ~3 FPS for smooth performance
         this.analysisInterval = setInterval(async () => {
+            if (isAnalyzing) return; // Skip if still analyzing previous frame
+
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Set canvas size to match video
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+                isAnalyzing = true;
 
-                // Draw current frame
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                try {
+                    // Set canvas size to match video
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
 
-                // Convert to base64
-                const frameData = canvas.toDataURL('image/jpeg', 0.8);
+                    // Draw current frame
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // Send for analysis
-                await this.analyzeFrame(frameData);
+                    // Convert to base64 with lower quality for speed
+                    const frameData = canvas.toDataURL('image/jpeg', 0.6);
 
-                // Update FPS
-                this.updateFPS();
+                    // Send for analysis
+                    await this.analyzeFrame(frameData);
+
+                    // Update FPS
+                    this.updateFPS();
+                } finally {
+                    isAnalyzing = false;
+                }
             }
-        }, 100); // 10 FPS
+        }, 333); // ~3 FPS for smooth performance
     }
 
     async analyzeFrame(frameData) {
@@ -758,10 +845,18 @@ class GymnasticsCoachApp {
             // Enable voice by default
             this.voiceEnabled = document.getElementById('coachingVoiceToggle').checked;
 
-            // Start analysis loop
-            this.coachingInterval = setInterval(() => {
-                this.analyzeCoachingFrame();
-            }, 1000); // Analyze every second
+            // Start analysis loop - slower for coaching to allow for Gemini processing
+            let isCoachingAnalyzing = false;
+            this.coachingInterval = setInterval(async () => {
+                if (isCoachingAnalyzing) return; // Skip if still analyzing
+
+                isCoachingAnalyzing = true;
+                try {
+                    await this.analyzeCoachingFrame();
+                } finally {
+                    isCoachingAnalyzing = false;
+                }
+            }, 1500); // Analyze every 1.5 seconds for coaching
 
         } catch (error) {
             console.error('Error starting coaching webcam:', error);

@@ -22,14 +22,17 @@
             <button class="mode-btn active" data-mode="upload" id="uploadModeBtn">
                 <span class="mode-icon">📁</span>
                 <span class="mode-text">Upload & Score</span>
+                <span class="mode-desc">Analyze uploaded video</span>
             </button>
             <button class="mode-btn" data-mode="webcam" id="webcamModeBtn">
                 <span class="mode-icon">📹</span>
-                <span class="mode-text">Live Analysis</span>
+                <span class="mode-text">Live Evaluation</span>
+                <span class="mode-desc">Real-time analysis with voice</span>
             </button>
             <button class="mode-btn" data-mode="coaching" id="coachingModeBtn">
                 <span class="mode-icon">🎓</span>
-                <span class="mode-text">AI Coach</span>
+                <span class="mode-text">AI Coach Training</span>
+                <span class="mode-desc">Step-by-step learning</span>
             </button>
         </div>
 
@@ -45,10 +48,44 @@
                 </div>
 
                 <div id="uploadProgress" class="upload-progress" style="display: none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
+                    <h3>Processing Video</h3>
+
+                    <!-- Upload Stage -->
+                    <div class="progress-stage">
+                        <div class="stage-header">
+                            <span class="stage-icon" id="uploadStageIcon">⏳</span>
+                            <span class="stage-label">Uploading Video</span>
+                            <span class="stage-status" id="uploadStageStatus">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="uploadProgressFill"></div>
+                        </div>
                     </div>
-                    <p id="progressText">Processing video...</p>
+
+                    <!-- Analysis Stage -->
+                    <div class="progress-stage">
+                        <div class="stage-header">
+                            <span class="stage-icon" id="analysisStageIcon">⏳</span>
+                            <span class="stage-label">Analyzing Frames</span>
+                            <span class="stage-status" id="analysisStageStatus">Waiting...</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="analysisProgressFill"></div>
+                        </div>
+                        <div class="progress-details" id="analysisDetails"></div>
+                    </div>
+
+                    <!-- Gemini Stage -->
+                    <div class="progress-stage" id="geminiStage" style="display: none;">
+                        <div class="stage-header">
+                            <span class="stage-icon" id="geminiStageIcon">⏳</span>
+                            <span class="stage-label">AI Coach Analysis</span>
+                            <span class="stage-status" id="geminiStageStatus">Waiting...</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="geminiProgressFill"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="uploadResults" class="results-section" style="display: none;">
