@@ -1011,18 +1011,20 @@ class GymnasticsCoachApp {
         const canvas = document.getElementById('webcamCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Analyze at ~10 FPS to reduce load
+        // Analyze at ~15 FPS with optimized frame size for speed
         this.analysisInterval = setInterval(async () => {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Set canvas size to match video
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+                // Downscale to 640x480 for faster processing and upload
+                const targetWidth = 640;
+                const targetHeight = 480;
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
 
-                // Draw current frame
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                // Draw downscaled frame
+                ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
 
-                // Convert to base64
-                const frameData = canvas.toDataURL('image/jpeg', 0.8);
+                // Convert to base64 with lower quality for speed
+                const frameData = canvas.toDataURL('image/jpeg', 0.6);
 
                 // Send for analysis
                 await this.analyzeFrame(frameData);
@@ -1030,7 +1032,7 @@ class GymnasticsCoachApp {
                 // Update FPS
                 this.updateFPS();
             }
-        }, 100); // 10 FPS
+        }, 66); // ~15 FPS - balanced speed with smaller payload
     }
 
     async analyzeFrame(frameData) {

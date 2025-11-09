@@ -335,10 +335,7 @@ async def analyze_webcam_frame(request: WebcamFrameRequest):
         skill = analysis.get('skill', 'general')
         score = analysis.get('score', 0.0)
 
-        # Get enhanced feedback from Gemini Vision API (if available)
-        gemini_enhanced = get_gemini_feedback(frame, skill, score)
-
-        # Prepare response data
+        # Prepare response data - ML feedback only for fast real-time scoring
         analysis_data = {
             'skill': skill,
             'score': score,
@@ -350,15 +347,9 @@ async def analyze_webcam_frame(request: WebcamFrameRequest):
                 'warnings': feedback.get('warnings', []),
                 'overall': feedback.get('overall', '')
             },
-            'angles': result.get('angles', {})
+            'angles': result.get('angles', {}),
+            'feedback_source': 'mediapipe'  # ML-only for low latency
         }
-
-        # Add Gemini feedback if available
-        if gemini_enhanced:
-            analysis_data['gemini_feedback'] = gemini_enhanced['gemini_feedback']
-            analysis_data['feedback_source'] = 'hybrid'  # MediaPipe + Gemini
-        else:
-            analysis_data['feedback_source'] = 'mediapipe'  # MediaPipe only
 
         response_data = WebcamAnalysisResponse(
             success=True,
@@ -491,50 +482,31 @@ async def health_check():
     }
 
 
-# Warm-up sequences
+# Warm-up sequences - Simple, demo-friendly actions that are easy to detect and perform
 WARMUP_SEQUENCES = {
-    'desk_worker': {
-        'name': 'Desk Worker Warm-Up',
-        'description': 'Perfect 5-minute warm-up for developers and desk workers',
-        'icon': '💻',
-        'actions': [
-            {'skill': 'sitting_posture', 'duration': 'Hold for 5 seconds'},
-            {'skill': 'arms_raised', 'duration': 'Hold for 5 seconds'},
-            {'skill': 'stretching', 'duration': 'Do 3 times'},
-            {'skill': 'standing_straight', 'duration': 'Hold for 5 seconds'},
-            {'skill': 't_pose', 'duration': 'Hold for 5 seconds'}
-        ]
-    },
-    'posture_check': {
-        'name': 'Posture Check Routine',
-        'description': 'Quick posture assessment - perfect for demos',
-        'icon': '🧍',
-        'actions': [
-            {'skill': 'standing_straight', 'duration': 'Hold steady'},
-            {'skill': 'sitting_posture', 'duration': 'Hold steady'},
-            {'skill': 't_pose', 'duration': 'Hold for 5 seconds'}
-        ]
-    },
-    'demo_quick': {
-        'name': 'Quick Demo',
-        'description': 'Fast 2-minute demo of AI coaching capabilities',
+    'quick_demo': {
+        'name': 'Quick Demo Flow',
+        'description': 'Simple 5-action sequence - perfect for demos, easy to perform and detect',
         'icon': '⚡',
         'actions': [
-            {'skill': 'thumbs_up', 'duration': 'Show clearly'},
-            {'skill': 'arms_raised', 'duration': 'Hold high'},
-            {'skill': 't_pose', 'duration': 'Hold steady'}
+            {'skill': 'standing_straight', 'duration': 'Stand with good posture, hold 5 seconds'},
+            {'skill': 'arms_raised', 'duration': 'Raise arms overhead, hold 5 seconds'},
+            {'skill': 't_pose', 'duration': 'Arms out to sides, hold 5 seconds'},
+            {'skill': 'stretching', 'duration': 'Side bends, do 3 each side'},
+            {'skill': 'standing_straight', 'duration': 'Return to center, hold 3 seconds'}
         ]
     },
-    'full_stretch': {
-        'name': 'Full Body Stretch',
-        'description': 'Complete stretching routine for energy boost',
-        'icon': '🤸',
+    'desk_break': {
+        'name': 'Desk Break Routine',
+        'description': 'Office-friendly movements - standing and sitting posture checks',
+        'icon': '💻',
         'actions': [
-            {'skill': 'standing_straight', 'duration': 'Start position'},
-            {'skill': 'arms_raised', 'duration': 'Reach up'},
-            {'skill': 't_pose', 'duration': 'Arms out'},
-            {'skill': 'stretching', 'duration': 'Side to side'},
-            {'skill': 'sitting_posture', 'duration': 'Cool down'}
+            {'skill': 'sitting_posture', 'duration': 'Sit with good posture, hold 5 seconds'},
+            {'skill': 'arms_raised', 'duration': 'Seated arm raise, hold 5 seconds'},
+            {'skill': 'standing_straight', 'duration': 'Stand up straight, hold 5 seconds'},
+            {'skill': 't_pose', 'duration': 'Arms extended wide, hold 5 seconds'},
+            {'skill': 'stretching', 'duration': 'Gentle side stretches, 3 times'},
+            {'skill': 'sitting_posture', 'duration': 'Sit back down, good posture, hold 3 seconds'}
         ]
     }
 }
@@ -594,7 +566,7 @@ async def get_training_instruction(request: TrainingInstructionRequest):
         # If Gemini is available, use it for better instructions
         if gemini_client:
             try:
-                # Check if it's a simple demo action or gymnastics
+                # All actions are simple and demo-friendly
                 is_simple_action = skill in ['sitting_posture', 'standing_straight', 'arms_raised', 'thumbs_up', 't_pose', 'stretching']
 
                 if is_simple_action:
@@ -674,7 +646,7 @@ async def assess_training_attempt(request: TrainingAssessmentRequest):
         _, buffer = cv2.imencode('.jpg', frame_rgb)
         image_bytes = buffer.tobytes()
 
-        # Create assessment prompt based on skill type
+        # Create assessment prompt - all actions are simple and demo-friendly
         is_simple_action = skill in ['sitting_posture', 'standing_straight', 'arms_raised', 'thumbs_up', 't_pose', 'stretching']
 
         if is_simple_action:
@@ -763,19 +735,19 @@ def get_fallback_instruction(skill: str) -> str:
 
 Sit comfortably in your chair with your feet flat on the floor. Keep your back straight and shoulders relaxed. Your head should be level, not tilted forward or back. Place your hands comfortably on your desk or lap.
 
-Key points: Shoulders should be back and down, not hunched. Your screen should be at eye level. Keep a small gap between the back of your knees and the chair seat. This is perfect for developers who sit all day!""",
+Key points: Shoulders should be back and down, not hunched. Your screen should be at eye level. This is perfect for developers who sit all day!""",
 
         'standing_straight': """Let's practice Standing Straight!
 
 Stand with your feet shoulder-width apart. Distribute your weight evenly on both feet. Keep your shoulders back and relaxed, not tensed up. Your head should be level, chin parallel to the ground.
 
-Focus on: Imagine a string pulling you up from the top of your head. Keep your core engaged but breathe naturally. Arms should hang naturally at your sides. This is great posture for standing meetings!""",
+Focus on: Imagine a string pulling you up from the top of your head. Keep your core engaged but breathe naturally. This is great posture for standing meetings!""",
 
         'arms_raised': """Let's practice Arms Raised!
 
 Start standing straight. Slowly raise both arms straight up overhead, reaching toward the ceiling. Keep your arms straight and parallel to each other. Your palms can face forward or toward each other.
 
-Remember: Keep your shoulders relaxed, don't shrug them up toward your ears. Your core should stay engaged. This is a simple movement that's easy to demo and great for stretching!""",
+Remember: Keep your shoulders relaxed, don't shrug them up toward your ears. This is a simple movement that's easy to demo and great for stretching!""",
 
         'thumbs_up': """Let's try Thumbs Up!
 
@@ -789,11 +761,11 @@ Stand straight with your feet shoulder-width apart. Extend both arms out to your
 
 Key points: Keep your arms straight and level with your shoulders. Palms can face down or forward. This is a classic pose used in gaming and animation - perfect for demos!""",
 
-        'stretching': """Let's do a Simple Desk Stretch!
+        'stretching': """Let's do a Side Stretch!
 
-Sit or stand comfortably. Reach both arms overhead and interlace your fingers. Gently lean to one side for a few seconds, then the other. You can also do shoulder rolls: roll your shoulders backward in a circular motion.
+Stand with feet shoulder-width apart. Raise both arms overhead and interlace your fingers. Gently lean to one side, feeling the stretch along your side. Hold for a few seconds, then switch to the other side. Repeat 3 times each side.
 
-Great for: Desk workers, developers, and anyone who needs a quick stretch break. Easy to demonstrate and feels good too!"""
+Great for: Desk workers, developers, and anyone who needs a stretch break. Feels amazing and easy to demonstrate!"""
     }
 
     return instructions.get(skill, f"""Let's practice {skill.replace('_', ' ').title()}!
